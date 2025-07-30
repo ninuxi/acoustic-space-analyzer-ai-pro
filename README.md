@@ -26,7 +26,7 @@ Strumento professionale di analisi acustica con generazione di catena DSP basata
 5. Clicca "Genera DSP Chain" per l'analisi IA
 
 ## Demo live
-[Disponibile su GitHub Pages](https://tuo-username.github.io/acoustic-space-analyzer-ai-pro)
+[Disponibile su GitHub Pages]([https://ninuxi.github.io/acoustic-space-analyzer-ai-pro])
 
 ## Configurazione sviluppo
 ```bash
