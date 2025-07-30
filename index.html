@@ -541,24 +541,46 @@
 
             // Handle file upload
             const handleFileUpload = async (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
-                
-                setUploadedFile(file);
-                setIsScanning3D(true);
-                
-                try {
-                    if (file.name.toLowerCase().endsWith('.json')) {
-                        await processJSONFile(file);
-                    } else {
-                        await processGenericFile(file);
-                    }
-                } catch (error) {
-                    console.error('File processing error:', error);
-                    alert('Errore nel caricamento: ' + error.message);
-                }
-                
-                setIsScanning3D(false);
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    setUploadedFile(file);
+    setIsScanning3D(true);
+    
+    try {
+        // Aggiungi questo blocco per gestire i file demo
+        if (file.name === 'room-scan.usdz') {
+            const spatialData = {
+                source: 'Demo File',
+                fileName: file.name,
+                roomDimensions: { 
+                    width: 5.2, 
+                    height: 3.1, 
+                    depth: 4.8 
+                },
+                volume: 77.4,
+                surfaceArea: 94.2,
+                uploadedAt: new Date().toISOString()
+            };
+            setSpatialData(spatialData);
+            generateSurfaces(spatialData.roomDimensions);
+            visualize3DData(spatialData);
+            setIsScanning3D(false);
+            return;
+        }
+        
+        if (file.name.toLowerCase().endsWith('.json')) {
+            await processJSONFile(file);
+        } else {
+            await processGenericFile(file);
+        }
+    } catch (error) {
+        console.error('File processing error:', error);
+        alert('Errore nel caricamento: ' + error.message);
+    }
+    
+    setIsScanning3D(false);
+};
             };
 
             // Process JSON file
