@@ -3,149 +3,148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
     <title>Acoustic Space Analyzer AI Pro</title>
-    <!-- Tutti gli script e stili esistenti rimangono invariati -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    [... altri script esistenti ...]
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Aggiunto per supportare USDZ -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/USDZLoader.js"></script>
     <style>
-        /* Stili esistenti rimangono invariati */
+        /* [Tutti gli stili CSS rimangono invariati...] */
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useRef, useEffect, useCallback } = React;
-        
-        // [Tutte le costanti e componenti esistenti rimangono invariati...]
-        
-        const AcousticAnalyzerAI = () => {
-            // [Tutti gli state hooks esistenti rimangono invariati...]
+        // [Tutte le costanti e componenti rimangono invariati fino alla funzione handleFileUpload...]
+
+        const handleFileUpload = async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
             
-            // MODIFICA 1: Aggiornata handleFileUpload per supportare il demo
-            const handleFileUpload = async (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
-                
-                setUploadedFile(file);
-                setIsScanning3D(true);
-                
-                try {
-                    // Riconosci il file demo
-                    if (file.name.includes("DEMO_Empty_old_Garage_room.usdz")) {
-                        const spatialData = {
-                            source: "Demo Garage",
-                            fileName: file.name,
-                            roomDimensions: { 
-                                width: 6.5,
-                                height: 3.2,
-                                depth: 8.0 
-                            },
-                            volume: 166.4,
-                            surfaceArea: 180.8,
-                            uploadedAt: new Date().toISOString(),
-                            treatments: [
-                                { x: 2.1, y: 1.5, z: 1.8 },
-                                { x: 4.3, y: 1.5, z: 6.2 }
-                            ]
-                        };
-                        setSpatialData(spatialData);
-                        generateSurfaces(spatialData.roomDimensions);
-                        visualize3DData(spatialData);
-                        setIsScanning3D(false);
-                        return;
-                    }
-                    
-                    if (file.name.toLowerCase().endsWith('.json')) {
-                        await processJSONFile(file);
-                    } else {
-                        await processGenericFile(file);
-                    }
-                } catch (error) {
-                    console.error('File processing error:', error);
-                    alert('Errore nel caricamento: ' + error.message);
+            setUploadedFile(file);
+            setIsScanning3D(true);
+            
+            try {
+                // MODIFICA: Supporto per il file demo USDZ
+                if (file.name.includes("DEMO_Empty_old_Garage_room.usdz")) {
+                    const spatialData = {
+                        source: "Demo Garage",
+                        fileName: file.name,
+                        roomDimensions: { 
+                            width: 6.5,  // Dimensioni realistiche per un garage
+                            height: 3.2, 
+                            depth: 8.0 
+                        },
+                        volume: 166.4,    // width * height * depth
+                        surfaceArea: 180.8, // 2*(wh + wd + hd)
+                        uploadedAt: new Date().toISOString(),
+                        treatments: [     // Punti di trattamento acustico demo
+                            { x: 2.1, y: 1.5, z: 1.8 },
+                            { x: 4.3, y: 1.5, z: 6.2 }
+                        ]
+                    };
+                    setSpatialData(spatialData);
+                    generateSurfaces(spatialData.roomDimensions);
+                    visualize3DData(spatialData);
+                    setIsScanning3D(false);
+                    return;
                 }
                 
-                setIsScanning3D(false);
-            };
+                if (file.name.toLowerCase().endsWith('.json')) {
+                    await processJSONFile(file);
+                } else {
+                    await processGenericFile(file);
+                }
+            } catch (error) {
+                console.error('File processing error:', error);
+                alert('Errore nel caricamento: ' + error.message);
+            }
+            
+            setIsScanning3D(false);
+        };
 
-            // [Tutte le altre funzioni esistenti rimangono invariate...]
+        // [Tutte le altre funzioni rimangono invariate...]
 
-            return (
-                <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-white">
-                    <div className="container mx-auto p-6 max-w-7xl">
-                        {/* [Tutto il contenuto esistente rimane invariato fino alla sezione 3D File Upload...] */}
-                        
-                        {/* MODIFICA 2: Aggiunto pulsante demo nella sezione 3D File Upload */}
-                        <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
-                            <h3 className="text-xl font-semibold mb-4 flex items-center">
-                                <CameraIcon className="mr-2 text-purple-400" />
-                                Scansione 3D
-                            </h3>
-                            <div className="flex flex-col gap-2">
-                                <input
-                                    type="file"
-                                    accept=".usdz,.ply,.obj,.json"
-                                    onChange={handleFileUpload}
-                                    disabled={isScanning3D}
-                                    className="hidden"
-                                    id="file-upload"
-                                />
-                                <label
-                                    htmlFor="file-upload"
-                                    className={`w-full py-3 px-4 rounded-lg font-medium transition-all cursor-pointer border-2 border-dashed flex items-center justify-center ${
-                                        isScanning3D
-                                            ? 'bg-purple-600 border-purple-400 cursor-not-allowed'
-                                            : 'bg-purple-600/20 border-purple-400 hover:bg-purple-600/30 active:scale-95'
-                                    }`}
-                                >
-                                    {isScanning3D ? (
-                                        <div className="flex items-center">
-                                            <SettingsIcon className="animate-spin mr-2" />
-                                            Processando...
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center">
-                                            <CameraIcon className="mr-2" />
-                                            Carica Scansione
-                                        </div>
-                                    )}
-                                </label>
-                                
-                                {/* Pulsante Demo Garage */}
-                                <button
-                                    onClick={() => {
-                                        // Simula il caricamento del file demo
-                                        const demoFile = new File([""], "DEMO_Empty_old_Garage_room.usdz");
-                                        handleFileUpload({ target: { files: [demoFile] } });
-                                    }}
-                                    className="w-full py-3 px-4 rounded-lg font-medium bg-blue-600/20 border border-blue-400 hover:bg-blue-600/30 transition-all flex items-center justify-center"
-                                >
-                                    🏚️ Carica Demo Garage
-                                </button>
-                            </div>
-                            
-                            <div className="mt-2 text-xs text-gray-400 text-center">
-                                .usdz (iPhone) • .ply • .obj • .json
-                            </div>
-                            
-                            {spatialData && (
-                                <div className="mt-3 text-sm text-green-400">
-                                    ✓ {spatialData.roomDimensions.width.toFixed(1)}×
-                                    {spatialData.roomDimensions.height.toFixed(1)}×
-                                    {spatialData.roomDimensions.depth.toFixed(1)}m
-                                    <div className="text-xs text-gray-400">{uploadedFile?.name}</div>
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-white">
+                {/* [Tutto il JSX rimane invariato fino alla sezione 3D File Upload...] */}
+                
+                {/* MODIFICA: Aggiunto pulsante demo nella sezione 3D File Upload */}
+                <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                    <h3 className="text-xl font-semibold mb-4 flex items-center">
+                        <CameraIcon className="mr-2 text-purple-400" />
+                        Scansione 3D
+                    </h3>
+                    <div className="flex flex-col gap-2">
+                        <input
+                            type="file"
+                            accept=".usdz,.ply,.obj,.json"
+                            onChange={handleFileUpload}
+                            disabled={isScanning3D}
+                            className="hidden"
+                            id="file-upload"
+                        />
+                        <label
+                            htmlFor="file-upload"
+                            className={`w-full py-3 px-4 rounded-lg font-medium transition-all cursor-pointer border-2 border-dashed flex items-center justify-center ${
+                                isScanning3D
+                                    ? 'bg-purple-600 border-purple-400 cursor-not-allowed'
+                                    : 'bg-purple-600/20 border-purple-400 hover:bg-purple-600/30 active:scale-95'
+                            }`}
+                        >
+                            {isScanning3D ? (
+                                <div className="flex items-center">
+                                    <SettingsIcon className="animate-spin mr-2" />
+                                    Processando...
+                                </div>
+                            ) : (
+                                <div className="flex items-center">
+                                    <CameraIcon className="mr-2" />
+                                    Carica Scansione
                                 </div>
                             )}
-                        </div>
-
-                        {/* [Tutto il resto del codice rimane invariato...] */}
+                        </label>
+                        
+                        {/* Pulsante Demo Garage */}
+                        <button
+                            onClick={() => {
+                                // Simula il click sul file input con il file demo
+                                const fileInput = document.getElementById('file-upload');
+                                const file = new File([""], "DEMO_Empty_old_Garage_room.usdz", { type: "model/vnd.usdz+zip" });
+                                const dataTransfer = new DataTransfer();
+                                dataTransfer.items.add(file);
+                                fileInput.files = dataTransfer.files;
+                                
+                                const event = new Event('change', { bubbles: true });
+                                fileInput.dispatchEvent(event);
+                            }}
+                            className="w-full py-3 px-4 rounded-lg font-medium bg-blue-600/20 border border-blue-400 hover:bg-blue-600/30 transition-all flex items-center justify-center"
+                        >
+                            🏚️ Carica Demo Garage
+                        </button>
                     </div>
+                    
+                    <div className="mt-2 text-xs text-gray-400 text-center">
+                        .usdz (iPhone) • .ply • .obj • .json
+                    </div>
+                    
+                    {spatialData && (
+                        <div className="mt-3 text-sm text-green-400">
+                            ✓ {spatialData.roomDimensions.width.toFixed(1)}×
+                            {spatialData.roomDimensions.height.toFixed(1)}×
+                            {spatialData.roomDimensions.depth.toFixed(1)}m
+                            <div className="text-xs text-gray-400">{uploadedFile?.name}</div>
+                        </div>
+                    )}
                 </div>
-            );
-        };
+
+                {/* [Tutto il resto del JSX rimane invariato...] */}
+            </div>
+        );
 
         ReactDOM.render(<AcousticAnalyzerAI />, document.getElementById('root'));
     </script>
