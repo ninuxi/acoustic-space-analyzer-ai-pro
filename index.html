@@ -1,119 +1,76 @@
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acoustic Space Analyzer AI Pro</title>
-    <!-- Aggiungi questa meta tag per risolvere problemi di sicurezza con Three.js -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-eval' 'unsafe-inline' data: blob: https://*;">
-    
-    <!-- Aggiornato alla versione più recente di Three.js (r128) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
-            background: #0a0a0a;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-        }
-        
-        /* [Mantieni tutti gli altri stili esistenti...] */
-    </style>
+  <meta charset="UTF-8">
+  <title>Acoustic Space Viewer</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0a0a0a;
+      color: white;
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+    #root {
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
 </head>
 <body>
-    <div id="root"></div>
+  <div id="root"></div>
 
-    <script type="text/babel">
-        // DEBUG: Aggiunto console log per verificare il caricamento
-        console.log("Applicazione inizializzata");
-        
-        const { useState, useRef, useEffect, useCallback } = React;
+  <!-- THREE.js viewer for .glb file -->
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js';
+    import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/controls/OrbitControls.js';
 
-        // DEBUG: Verifica che Three.js sia caricato correttamente
-        if (!THREE) {
-            console.error("Three.js non è stato caricato correttamente");
-        } else {
-            console.log("Three.js versione:", THREE.REVISION);
-        }
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.getElementById("root").appendChild(renderer.domElement);
 
-        // [Tutti i componenti e le costanti rimangono invariati...]
+    const controls = new OrbitControls(camera, renderer.domElement);
 
-        const AcousticAnalyzerAI = () => {
-            // DEBUG: Stato iniziale
-            console.log("Componente montato");
-            
-            // [Tutti gli hook di stato rimangono invariati...]
+    // Lighting
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(10, 10, 10);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
-            useEffect(() => {
-                console.log("Effetto di montaggio eseguito");
-                try {
-                    initialize3DVisualization();
-                    loadApiConfig();
-                } catch (error) {
-                    console.error("Errore durante l'inizializzazione:", error);
-                }
-                
-                return () => {
-                    // [Cleanup esistente...]
-                };
-            }, []);
+    // Camera position
+    camera.position.set(2, 2, 4);
+    controls.update();
 
-            const initialize3DVisualization = () => {
-                console.log("Inizializzazione visualizzazione 3D");
-                if (!canvasRef.current) {
-                    console.error("Canvas ref non disponibile");
-                    return;
-                }
-                
-                try {
-                    // [Codice di inizializzazione 3D esistente...]
-                    console.log("Scene 3D inizializzata con successo");
-                } catch (error) {
-                    console.error("Errore inizializzazione 3D:", error);
-                }
-            };
+    // Load GLB model from GitHub repo
+    const loader = new GLTFLoader();
+    loader.load(
+      'https://raw.githubusercontent.com/ninuxi/acoustic-space-analyzer-ai-pro/main/samples/DEMO_Empty_old_Garage_room.glb',
+      function (gltf) {
+        scene.add(gltf.scene);
+        animate();
+      },
+      undefined,
+      function (error) {
+        console.error('Errore nel caricamento del modello GLB:', error);
+      }
+    );
 
-            // [Tutte le altre funzioni rimangono invariate...]
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
 
-            return (
-                <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-white">
-                    {/* DEBUG: Aggiunto messaggio di caricamento */}
-                    {!sceneRef.current && (
-                        <div className="fixed inset-0 flex items-center justify-center z-50">
-                            <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-purple-500"></div>
-                        </div>
-                    )}
-                    
-                    <div className="container mx-auto p-6 max-w-7xl">
-                        {/* [Tutto il resto del JSX rimane invariato...] */}
-                    </div>
-                </div>
-            );
-        };
-
-        // DEBUG: Verifica che React sia caricato prima del render
-        if (window.React && window.ReactDOM) {
-            ReactDOM.render(
-                <AcousticAnalyzerAI />,
-                document.getElementById('root'),
-                () => console.log("Render completato")
-            );
-        } else {
-            console.error("React non è stato caricato correttamente");
-            document.getElementById('root').innerHTML = `
-                <div class="error-message">
-                    <h2>Errore di caricamento</h2>
-                    <p>Le librerie necessarie non sono state caricate correttamente.</p>
-                    <p>Ricaricare la pagina o verificare la connessione internet.</p>
-                </div>
-            `;
-        }
-    </script>
+    // Resize handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
 </body>
 </html>
