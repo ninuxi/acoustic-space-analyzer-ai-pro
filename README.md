@@ -1,6 +1,7 @@
 # Acoustic Space Analyzer AI Pro 🎚️
 
-![Demo Screenshot](https://via.placeholder.com/800x500.png?text=Acoustic+Analyzer+Demo)
+!<img width="1413" height="774" alt="Screenshot 2025-07-30 alle 16 40 03" src="https://github.com/user-attachments/assets/449980bb-71ab-4efb-ac24-6c4b58504ac7" />
+
 
 Strumento professionale di analisi acustica con generazione di catena DSP basata su IA.
 
