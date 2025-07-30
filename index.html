@@ -548,24 +548,47 @@
     setIsScanning3D(true);
     
     try {
-        // Aggiungi questo blocco per gestire i file demo
-        if (file.name === 'room-scan.usdz') {
+        // Riconosci il file demo
+        if (file.name.includes("DEMO_Empty_old_Garage_room.usdz")) {
             const spatialData = {
-                source: 'Demo File',
+                source: "Demo Garage",
                 fileName: file.name,
                 roomDimensions: { 
-                    width: 5.2, 
-                    height: 3.1, 
-                    depth: 4.8 
+                    width: 6.5,  // Modifica queste dimensioni secondo la realtà
+                    height: 3.2, 
+                    depth: 8.0 
                 },
-                volume: 77.4,
-                surfaceArea: 94.2,
-                uploadedAt: new Date().toISOString()
+                volume: 166.4,  // width * height * depth
+                surfaceArea: 180.8,  // 2*(wh + wd + hd)
+                uploadedAt: new Date().toISOString(),
+                treatments: [  // Aggiungi punti di trattamento acustico demo
+                    { x: 2.1, y: 1.5, z: 1.8 },
+                    { x: 4.3, y: 1.5, z: 6.2 }
+                ]
             };
             setSpatialData(spatialData);
             generateSurfaces(spatialData.roomDimensions);
             visualize3DData(spatialData);
             setIsScanning3D(false);
+            return;
+        }
+        
+        if (file.name.toLowerCase().endsWith('.json')) {
+            await processJSONFile(file);
+        } else {
+            await processGenericFile(file);
+        }
+    } catch (error) {
+        console.error('File processing error:', error);
+        alert('Errore nel caricamento: ' + error.message);
+    }
+    
+    setIsScanning3D(false);
+};
+
+
+
+
             return;
         }
         
