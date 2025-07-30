@@ -1,9 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <title>Acoustic Space Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acoustic Space Viewer - GLB</title>
   <style>
     body {
       margin: 0;
@@ -16,54 +16,168 @@
       width: 100vw;
       height: 100vh;
     }
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.5rem;
+      color: #ffffff;
+      background: rgba(0,0,0,0.7);
+      padding: 20px;
+      border-radius: 10px;
+    }
+    #controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 5px;
+    }
+    button {
+      background: #4a4a4a;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      margin: 5px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #5a5a5a;
+    }
   </style>
 </head>
 <body>
   <div id="root"></div>
+  <div id="loading">Caricamento modello...</div>
+  <div id="controls" style="display: none;">
+    <button id="resetView">Reset Visuale</button>
+    <button id="toggleWireframe">Mostra Wireframe</button>
+  </div>
 
-  <!-- THREE.js viewer for .glb file -->
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js';
     import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js';
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/controls/OrbitControls.js';
 
+    // Scene setup
     const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a0a);
+    
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
     document.getElementById("root").appendChild(renderer.domElement);
 
+    // Controls
     const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
 
     // Lighting
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(10, 10, 10);
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+    scene.add(ambientLight);
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 10, 5);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.camera.near = 0.1;
+    directionalLight.shadow.camera.far = 50;
+    scene.add(directionalLight);
 
-    // Camera position
-    camera.position.set(2, 2, 4);
+    // Grid helper
+    const gridHelper = new THREE.GridHelper(20, 20, 0x333333, 0x333333);
+    scene.add(gridHelper);
+
+    // Initial camera position
+    camera.position.set(5, 5, 5);
     controls.update();
+
+    // Model variables
+    let model;
+    let wireframeVisible = false;
 
     // Load GLB model from GitHub repo
     const loader = new GLTFLoader();
     loader.load(
       'https://raw.githubusercontent.com/ninuxi/acoustic-space-analyzer-ai-pro/main/samples/DEMO_Empty_old_Garage_room.glb',
       function (gltf) {
-        scene.add(gltf.scene);
-        animate();
+        model = gltf.scene;
+        
+        // Enable shadows for all meshes
+        model.traverse(function(node) {
+          if (node.isMesh) {
+            node.castShadow = true;
+            node.receiveShadow = true;
+          }
+        });
+        
+        scene.add(model);
+        
+        // Center and scale model
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        
+        model.position.x += (model.position.x - center.x);
+        model.position.y += (model.position.y - center.y);
+        model.position.z += (model.position.z - center.z);
+        
+        // Adjust camera to fit model
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        let cameraZ = Math.abs(maxDim / 2 * Math.tan(fov * 2));
+        cameraZ *= 1.5; // zoom out a little
+        
+        camera.position.z = cameraZ;
+        controls.target.copy(center);
+        controls.update();
+        
+        // Hide loading, show controls
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('controls').style.display = 'block';
       },
-      undefined,
+      function (xhr) {
+        // Progress callback
+        const percentLoaded = (xhr.loaded / xhr.total * 100).toFixed(0);
+        document.getElementById('loading').textContent = `Caricamento modello... ${percentLoaded}%`;
+      },
       function (error) {
         console.error('Errore nel caricamento del modello GLB:', error);
+        document.getElementById('loading').textContent = 'Errore nel caricamento del modello';
       }
     );
 
+    // Control buttons
+    document.getElementById('resetView').addEventListener('click', () => {
+      controls.reset();
+      camera.position.set(5, 5, 5);
+      controls.update();
+    });
+    
+    document.getElementById('toggleWireframe').addEventListener('click', () => {
+      wireframeVisible = !wireframeVisible;
+      if (model) {
+        model.traverse(function(node) {
+          if (node.isMesh) {
+            node.material.wireframe = wireframeVisible;
+          }
+        });
+      }
+      document.getElementById('toggleWireframe').textContent = 
+        wireframeVisible ? 'Nascondi Wireframe' : 'Mostra Wireframe';
+    });
+
+    // Animation loop
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
       renderer.render(scene, camera);
     }
+    animate();
 
     // Resize handler
     window.addEventListener('resize', () => {
