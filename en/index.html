@@ -1,247 +1,1872 @@
-<!-- ================================================================= -->
-<!--  PHASE-ALIGNMENT-AI  –  integrated into the React application     -->
-<!-- ================================================================= -->
-<script type="text/babel">
-/*
- *  PhaseAlignmentAI
- *  FFT-based speaker phase alignment with AI-driven corrections
- *  (works inside the existing React context)
- */
-class PhaseAlignmentAI {
-  constructor(apiKey) {
-    this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
-    this.fftSize = 8192;
-    this.sampleRate = this.audioContext.sampleRate;
-    this.apiKey = apiKey;
-
-    // speaker positions (meters)
-    this.speakerSetup = {
-      sub:        { pos: [0, 0, 0],   frq: [20, 120] },
-      mainLR:     { pos: [-2, 1, 0], frq: [80, 20000] },
-      frontfill:  { pos: [0, 0.5, 2], frq: [200, 8000] }
-    };
-  }
-
-  /* ---------------------------------------------------------------
-   *  1) generate pink-noise test samples
-   * ------------------------------------------------------------- */
-  generatePinkNoiseBuffer(duration = 2) {
-    const length = duration * this.sampleRate;
-    const buffer = this.audioContext.createBuffer(1, length, this.sampleRate);
-    const data   = buffer.getChannelData(0);
-
-    let b0=0, b1=0, b2=0, b3=0, b4=0, b5=0, b6=0;
-    for (let i=0; i<length; i++) {
-      const white = Math.random() * 2 - 1;
-      b0 = 0.99886 * b0 + white * 0.0555179;
-      b1 = 0.99332 * b1 + white * 0.0750759;
-      b2 = 0.96900 * b2 + white * 0.1538520;
-      b3 = 0.86650 * b3 + white * 0.3104856;
-      b4 = 0.55000 * b4 + white * 0.5329522;
-      b5 = -0.7616 * b5 - white * 0.0168980;
-      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
-      b6 = white * 0.115926;
-    }
-    return buffer;
-  }
-
-  /* ---------------------------------------------------------------
-   *  2) perform complex FFT → magnitude + phase
-   * ------------------------------------------------------------- */
-  async performComplexFFT(audioBuffer) {
-    const N = this.fftSize;
-    const signal = audioBuffer.getChannelData(0).slice(0, N);
-    const real   = new Float32Array(N);
-    const imag   = new Float32Array(N);
-    for (let i=0; i<N; i++) { real[i]=signal[i]; imag[i]=0; }
-    this.fft(real, imag);
-
-    const mag  = new Float32Array(N/2);
-    const ph   = new Float32Array(N/2);
-    for (let i=0; i<N/2; i++) {
-      mag[i] = Math.sqrt(real[i]**2 + imag[i]**2);
-      ph[i]  = Math.atan2(imag[i], real[i]);
-    }
-    return { magnitude: mag, phase: ph };
-  }
-
-  /* ---------------------------------------------------------------
-   *  3) ask AI for phase corrections
-   * ------------------------------------------------------------- */
-  async fetchPhaseCorrections(measurements) {
-    const prompt = `
-ANALISI FASE ACUSTICA – Allineamento Speaker System
-
-Dati misurazione:
-- SUB: Fase media ${measurements.sub.avgPhase.toFixed(2)} rad, Delay ${measurements.sub.delay.toFixed(1)} ms
-- MAIN L/R: Fase media ${measurements.mainLR.avgPhase.toFixed(2)} rad, Delay ${measurements.mainLR.delay.toFixed(1)} ms
-- FRONTFILL: Fase media ${measurements.frontfill.avgPhase.toFixed(2)} rad, Delay ${measurements.frontfill.delay.toFixed(1)} ms
-
-Frequenze di crossover:
-- Sub/Main: 80-120 Hz
-- Main/Frontfill: 200-300 Hz
-
-Restituisci **solo** un JSON valido:
-{
-  "sub":       { "delay_ms": X, "phase_invert": boolean, "allpass_freq": X },
-  "mainLR":    { "delay_ms": X, "phase_invert": boolean, "allpass_freq": X },
-  "frontfill": { "delay_ms": X, "phase_invert": boolean, "allpass_freq": X }
-}
-`;
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'anthropic/claude-3.5-sonnet',
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await res.json();
-    return JSON.parse(data.choices[0].message.content);
-  }
-
-  /* ---------------------------------------------------------------
-   *  4) run full phase-alignment workflow
-   * ------------------------------------------------------------- */
-  async runAlignment() {
-    console.log('🎤 Measuring all speakers...');
-    const measurements = {};
-    for (const [name, cfg] of Object.entries(this.speakerSetup)) {
-      const noise   = this.generatePinkNoiseBuffer();
-      const { magnitude, phase } = await this.performComplexFFT(noise);
-      const avgPhase = phase.reduce((a,b)=>a+b) / phase.length;
-      measurements[name] = { magnitude, phase, avgPhase, delay: 0 }; // delay placeholder
-    }
-
-    console.log('🧠 Requesting AI phase corrections...');
-    const corrections = await this.fetchPhaseCorrections(measurements);
-
-    console.log('✅ Phase alignment complete:', corrections);
-    return corrections;
-  }
-
-  /* ---------------------------------------------------------------
-   *  basic FFT (Cooley–Tukey radix-2)
-   * ------------------------------------------------------------- */
-  fft(real, imag) {
-    const N = real.length;
-    if (N <= 1) return;
-    // bit-reverse
-    for (let i=1, j=0; i<N; ++i) {
-      let bit = N >> 1;
-      for (; j & bit; bit >>= 1) j ^= bit;
-      j ^= bit;
-      if (i < j) [real[i], real[j], imag[i], imag[j]] = [real[j], real[i], imag[j], imag[i]];
-    }
-    for (let len=2; len<=N; len<<=1) {
-      const ang = 2*Math.PI/len;
-      const wlen = Math.cos(ang) - Math.sin(ang)*1j;
-      for (let i=0; i<N; i+=len) {
-        let w = 1;
-        for (let j=0; j<len/2; ++j) {
-          const u = real[i+j], v = real[i+j+len/2]*w.real - imag[i+j+len/2]*w.imag;
-          const t = imag[i+j], s = real[i+j+len/2]*w.imag + imag[i+j+len/2]*w.real;
-          real[i+j] = u + v;
-          imag[i+j] = t + s;
-          real[i+j+len/2] = u - v;
-          imag[i+j+len/2] = t - s;
-          const tmp = w.real*wlen.real - w.imag*wlen.imag;
-          w.imag = w.real*wlen.imag + w.imag*wlen.real;
-          w.real = tmp;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acoustic Space Analyzer AI Pro</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            background: #0a0a0a;
         }
-      }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #4a4a4a;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #5a5a5a;
+        }
+        
+        /* Custom styles for range inputs */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        
+        input[type="range"]::-webkit-slider-track {
+            background: #374151;
+            height: 8px;
+            border-radius: 4px;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            background: #ec4899;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            margin-top: -6px;
+        }
+        
+        input[type="range"]::-moz-range-track {
+            background: #374151;
+            height: 8px;
+            border-radius: 4px;
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            background: #ec4899;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            border: none;
+        }
+        
+        /* EQ Slider styles */
+        .eq-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 120px;
+            background: transparent;
+            outline: none;
+            writing-mode: bt-lr; /* IE */
+            -webkit-appearance: slider-vertical; /* WebKit */
+            cursor: pointer;
+        }
+        
+        .eq-slider::-webkit-slider-track {
+            width: 8px;
+            background: #374151;
+            border-radius: 4px;
+        }
+        
+        .eq-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 12px;
+            background: #10b981;
+            cursor: pointer;
+            border-radius: 6px;
+        }
+        
+        /* Animation for pulsing elements */
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        /* Animation for spinning elements */
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        
+        /* Glow effect */
+        .glow {
+            box-shadow: 0 0 20px rgba(236, 72, 153, 0.5);
+        }
+        
+        /* Gradient text */
+        .gradient-text {
+            background: linear-gradient(to right, #06b6d4, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Demo banner */
+        .demo-banner {
+            background: linear-gradient(90deg, #f59e0b, #ef4444, #8b5cf6);
+            background-size: 200% 100%;
+            animation: gradient 3s ease infinite;
+        }
+        
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect, useCallback } = React;
+        
+        // Icon components
+        const MicIcon = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" x2="12" y1="19" y2="22"/>
+            </svg>
+        );
+        
+        const CameraIcon = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
+                <circle cx="12" cy="13" r="3"/>
+            </svg>
+        );
+        
+        const BrainIcon = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+                <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+            </svg>
+        );
+        
+        const PlayIcon = ({ size = 20, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <polygon points="6 3 20 12 6 21 6 3"/>
+            </svg>
+        );
+        
+        const PauseIcon = ({ size = 20, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <rect x="14" y="4" width="4" height="16" rx="1"/>
+                <rect x="6" y="4" width="4" height="16" rx="1"/>
+            </svg>
+        );
+        
+        const SettingsIcon = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                <circle cx="12" cy="12" r="3"/>
+            </svg>
+        );
+        
+        const DownloadIcon = ({ size = 20, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" x2="12" y1="15" y2="3"/>
+            </svg>
+        );
+        
+        const RotateCcwIcon = ({ size = 20, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+            </svg>
+        );
+        
+        const KeyIcon = ({ size = 20, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/>
+                <path d="m21 2-9.6 9.6"/>
+                <circle cx="7.5" cy="15.5" r="5.5"/>
+            </svg>
+        );
+
+        const GithubIcon = ({ size = 20, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+        );
+
+        // Material database with English names
+        const MATERIALS = {
+            'plasterboard': { name: 'Plasterboard', absorption: { 125: 0.29, 250: 0.10, 500: 0.05, 1000: 0.04, 2000: 0.07, 4000: 0.09 }, color: '#e0e0e0' },
+            'solid_wood': { name: 'Solid Wood', absorption: { 125: 0.15, 250: 0.11, 500: 0.10, 1000: 0.07, 2000: 0.06, 4000: 0.07 }, color: '#8b4513' },
+            'glass': { name: 'Glass', absorption: { 125: 0.35, 250: 0.25, 500: 0.18, 1000: 0.12, 2000: 0.07, 4000: 0.04 }, color: '#87ceeb' },
+            'concrete': { name: 'Concrete', absorption: { 125: 0.01, 250: 0.01, 500: 0.02, 1000: 0.02, 2000: 0.03, 4000: 0.03 }, color: '#808080' },
+            'carpet': { name: 'Carpet', absorption: { 125: 0.08, 250: 0.24, 500: 0.57, 1000: 0.69, 2000: 0.71, 4000: 0.73 }, color: '#8b0000' },
+            'heavy_curtain': { name: 'Heavy Curtain', absorption: { 125: 0.14, 250: 0.35, 500: 0.55, 1000: 0.72, 2000: 0.70, 4000: 0.65 }, color: '#4b0082' },
+            'acoustic_panel': { name: 'Acoustic Panel', absorption: { 125: 0.20, 250: 0.65, 500: 0.85, 1000: 0.95, 2000: 0.95, 4000: 0.90 }, color: '#2f4f4f' },
+            'plaster': { name: 'Plaster', absorption: { 125: 0.02, 250: 0.02, 500: 0.03, 1000: 0.04, 2000: 0.05, 4000: 0.05 }, color: '#f5f5dc' },
+            'brick': { name: 'Brick', absorption: { 125: 0.03, 250: 0.03, 500: 0.03, 1000: 0.04, 2000: 0.05, 4000: 0.07 }, color: '#a52a2a' },
+            'hardwood': { name: 'Hardwood Floor', absorption: { 125: 0.04, 250: 0.04, 500: 0.07, 1000: 0.06, 2000: 0.06, 4000: 0.07 }, color: '#daa520' }
+        };
+
+        // 16-band frequencies for equalizer
+        const EQ_FREQUENCIES = [20, 31.5, 63, 125, 250, 500, 1000, 2000, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000];
+
+        // DSP Processors for chain
+        const DSP_PROCESSORS = {
+            eq: { name: 'Parametric EQ', params: ['frequency', 'gain', 'q'] },
+            compressor: { name: 'Compressor', params: ['threshold', 'ratio', 'attack', 'release', 'knee'] },
+            limiter: { name: 'Limiter', params: ['threshold', 'release', 'lookahead'] },
+            gate: { name: 'Noise Gate', params: ['threshold', 'attack', 'hold', 'release'] },
+            reverb: { name: 'Reverb', params: ['roomSize', 'damping', 'wetLevel', 'dryLevel'] },
+            delay: { name: 'Delay', params: ['time', 'feedback', 'mix'] },
+            hpf: { name: 'High-pass Filter', params: ['frequency', 'q'] },
+            lpf: { name: 'Low-pass Filter', params: ['frequency', 'q'] }
+        };
+
+        const AcousticAnalyzerAI = () => {
+            // State hooks
+            const [isRecording, setIsRecording] = useState(false);
+            const [recordingTime, setRecordingTime] = useState(0);
+            const [isScanning3D, setIsScanning3D] = useState(false);
+            const [audioData, setAudioData] = useState(null);
+            const [spatialData, setSpatialData] = useState(null);
+            const [aiAnalysis, setAiAnalysis] = useState(null);
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [realTimeFFT, setRealTimeFFT] = useState([]);
+            const [deviationData, setDeviationData] = useState([]);
+            const [uploadedFile, setUploadedFile] = useState(null);
+            const [microphoneStatus, setMicrophoneStatus] = useState('not-initialized');
+            const [selectedMaterials, setSelectedMaterials] = useState({});
+            const [surfaces, setSurfaces] = useState([]);
+            const [apiConfig, setApiConfig] = useState({
+                provider: 'openrouter',
+                apiKey: '',
+                model: 'deepseek/deepseek-r1-distill-llama-70b'
+            });
+            const [dspChain, setDspChain] = useState([]);
+            const [eqSettings, setEqSettings] = useState(
+                EQ_FREQUENCIES.reduce((acc, freq) => ({ ...acc, [freq]: 0 }), {})
+            );
+            const [demoLoaded, setDemoLoaded] = useState(false);
+            
+            // Refs
+            const canvasRef = useRef(null);
+            const audioContextRef = useRef(null);
+            const analyserRef = useRef(null);
+            const microphoneRef = useRef(null);
+            const animationRef = useRef(null);
+            const sceneRef = useRef(null);
+            const rendererRef = useRef(null);
+            const cameraRef = useRef(null);
+            const recordingIntervalRef = useRef(null);
+            
+            // Pink noise reference spectrum (ideal response)
+            const PINK_NOISE_REFERENCE = {
+                20: 85, 31.5: 83, 63: 81, 125: 79, 250: 77, 500: 75,
+                1000: 73, 2000: 71, 3150: 69, 4000: 68, 5000: 67,
+                6300: 66, 8000: 65, 10000: 64, 12500: 63, 16000: 62
+            };
+
+            // Initialize on mount
+            useEffect(() => {
+                initialize3DVisualization();
+                loadApiConfig();
+                
+                return () => {
+                    if (animationRef.current) {
+                        cancelAnimationFrame(animationRef.current);
+                    }
+                    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                        audioContextRef.current.close();
+                    }
+                    if (recordingIntervalRef.current) {
+                        clearInterval(recordingIntervalRef.current);
+                    }
+                };
+            }, []);
+
+            // Load API config from localStorage
+            const loadApiConfig = () => {
+                try {
+                    const saved = localStorage.getItem('acousticAnalyzerApiConfig');
+                    if (saved) {
+                        setApiConfig(JSON.parse(saved));
+                    }
+                } catch (e) {
+                    console.error('Failed to load API config:', e);
+                }
+            };
+
+            // Save API config to localStorage
+            const saveApiConfig = (config) => {
+                setApiConfig(config);
+                try {
+                    localStorage.setItem('acousticAnalyzerApiConfig', JSON.stringify(config));
+                } catch (e) {
+                    console.error('Failed to save API config:', e);
+                }
+            };
+
+            // Load demo file from GitHub repository
+            const loadDemoFile = async () => {
+                setIsScanning3D(true);
+                setDemoLoaded(false);
+                
+                try {
+                    // Simulate loading the demo GLB file
+                    const demoData = {
+                        source: 'DEMO - Empty Old Garage Room',
+                        fileName: 'DEMO_Empty_old_Garage_room.glb',
+                        roomDimensions: {
+                            width: 6.2,  // Garage width
+                            height: 2.8, // Standard garage height
+                            depth: 5.8   // Garage depth
+                        },
+                        volume: 6.2 * 2.8 * 5.8, // 100.6 m³
+                        surfaceArea: 2 * (6.2 * 2.8 + 6.2 * 5.8 + 2.8 * 5.8), // 141.9 m²
+                        uploadedAt: new Date().toISOString(),
+                        isDemo: true,
+                        treatments: [
+                            { x: -2, y: 0, z: -2, type: 'absorption' },
+                            { x: 2, y: 0, z: -2, type: 'absorption' },
+                            { x: 0, y: 1, z: 2, type: 'diffusion' }
+                        ]
+                    };
+                    
+                    // Simulate network delay
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    
+                    setSpatialData(demoData);
+                    generateSurfaces(demoData.roomDimensions);
+                    visualize3DData(demoData);
+                    
+                    // Auto-assign realistic materials for garage
+                    const demoMaterials = {
+                        'floor': 'concrete',
+                        'ceiling': 'plasterboard',
+                        'wall_front': 'concrete',
+                        'wall_back': 'concrete', 
+                        'wall_left': 'brick',
+                        'wall_right': 'brick'
+                    };
+                    setSelectedMaterials(demoMaterials);
+                    
+                    setDemoLoaded(true);
+                    
+                } catch (error) {
+                    console.error('Demo loading error:', error);
+                    alert('Error loading demo: ' + error.message);
+                }
+                
+                setIsScanning3D(false);
+            };
+
+            // Initialize audio system
+            const initializeAudio = async () => {
+                try {
+                    setMicrophoneStatus('requesting');
+                    
+                    if (!audioContextRef.current) {
+                        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+                            sampleRate: 48000,
+                            latencyHint: 'interactive'
+                        });
+                    }
+                    
+                    if (audioContextRef.current.state === 'suspended') {
+                        await audioContextRef.current.resume();
+                    }
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: { 
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                            sampleRate: 48000,
+                            channelCount: 1
+                        } 
+                    });
+                    
+                    analyserRef.current = audioContextRef.current.createAnalyser();
+                    analyserRef.current.fftSize = 16384; // High resolution FFT
+                    analyserRef.current.smoothingTimeConstant = 0.1;
+                    
+                    microphoneRef.current = audioContextRef.current.createMediaStreamSource(stream);
+                    microphoneRef.current.connect(analyserRef.current);
+                    
+                    setMicrophoneStatus('granted');
+                    startRealTimeFFT();
+                    
+                    console.log('Audio system initialized');
+                    
+                } catch (error) {
+                    console.error('Audio initialization error:', error);
+                    setMicrophoneStatus('denied');
+                    
+                    if (error.name === 'NotAllowedError') {
+                        alert('Microphone permissions denied. Click the microphone icon in the address bar and allow access.');
+                    } else {
+                        alert('Audio error: ' + error.message);
+                    }
+                }
+            };
+
+            // Perform FFT analysis
+            const performFFTAnalysis = () => {
+                if (!analyserRef.current || !audioContextRef.current) return null;
+                
+                const bufferLength = analyserRef.current.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                const floatArray = new Float32Array(bufferLength);
+                
+                analyserRef.current.getByteFrequencyData(dataArray);
+                analyserRef.current.getFloatFrequencyData(floatArray);
+                
+                const sampleRate = audioContextRef.current.sampleRate;
+                const nyquist = sampleRate / 2;
+                
+                const frequencyData = EQ_FREQUENCIES.map(freq => {
+                    const index = Math.round((freq / nyquist) * bufferLength);
+                    const amplitude = dataArray[index] || 0;
+                    const dbFS = floatArray[index] || -Infinity;
+                    const dbSPL = dbFS + 94;
+                    
+                    // Calculate deviation from pink noise reference
+                    const reference = PINK_NOISE_REFERENCE[freq] || 70;
+                    const deviation = dbSPL - reference;
+                    
+                    return {
+                        frequency: freq,
+                        amplitude: amplitude,
+                        dbFS: dbFS,
+                        dbSPL: dbSPL,
+                        deviation: deviation,
+                        reference: reference
+                    };
+                });
+                
+                // Calculate overall metrics
+                const rms = Math.sqrt(dataArray.reduce((sum, val) => sum + (val/255) * (val/255), 0) / bufferLength);
+                const dbRMS = 20 * Math.log10(rms + 1e-10);
+                const peakLevel = Math.max(...dataArray);
+                const crestFactor = peakLevel / (rms * 255);
+                
+                return {
+                    timestamp: Date.now(),
+                    frequencyResponse: frequencyData,
+                    rms: rms,
+                    dbRMS: dbRMS,
+                    peakLevel: peakLevel,
+                    crestFactor: crestFactor
+                };
+            };
+
+            // Start real-time FFT visualization
+            const startRealTimeFFT = () => {
+                if (!analyserRef.current) return;
+                
+                const updateFFT = () => {
+                    if (microphoneStatus === 'granted') {
+                        const analysis = performFFTAnalysis();
+                        if (analysis) {
+                            setRealTimeFFT(analysis.frequencyResponse);
+                            setDeviationData(analysis.frequencyResponse.map(f => f.deviation));
+                        }
+                    }
+                    animationRef.current = requestAnimationFrame(updateFFT);
+                };
+                updateFFT();
+            };
+
+            // Start recording
+            const startRecording = async () => {
+                if (microphoneStatus !== 'granted') {
+                    await initializeAudio();
+                    if (microphoneStatus !== 'granted') return;
+                }
+                
+                setIsRecording(true);
+                setRecordingTime(0);
+                setAudioData([]);
+                
+                const startTime = Date.now();
+                recordingIntervalRef.current = setInterval(() => {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    setRecordingTime(elapsed);
+                    
+                    const analysis = performFFTAnalysis();
+                    if (analysis) {
+                        setAudioData(prev => [...(prev || []), analysis]);
+                    }
+                    
+                    if (elapsed >= 15) {
+                        stopRecording();
+                    }
+                }, 100); // Sample every 100ms
+            };
+
+            // Stop recording
+            const stopRecording = () => {
+                if (recordingIntervalRef.current) {
+                    clearInterval(recordingIntervalRef.current);
+                    recordingIntervalRef.current = null;
+                }
+                setIsRecording(false);
+                console.log('Recording completed');
+            };
+
+            // Initialize 3D visualization
+            const initialize3DVisualization = () => {
+                if (!canvasRef.current) return;
+                
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x0a0a0a);
+                scene.fog = new THREE.Fog(0x0a0a0a, 10, 50);
+                
+                const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer({ 
+                    canvas: canvasRef.current, 
+                    antialias: true,
+                    alpha: true
+                });
+                renderer.setSize(400, 300);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+                scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(5, 10, 5);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.camera.near = 0.1;
+                directionalLight.shadow.camera.far = 50;
+                directionalLight.shadow.camera.left = -10;
+                directionalLight.shadow.camera.right = 10;
+                directionalLight.shadow.camera.top = 10;
+                directionalLight.shadow.camera.bottom = -10;
+                scene.add(directionalLight);
+                
+                // Grid
+                const gridHelper = new THREE.GridHelper(20, 20, 0x333333, 0x333333);
+                scene.add(gridHelper);
+                
+                camera.position.set(8, 6, 8);
+                camera.lookAt(0, 0, 0);
+                
+                sceneRef.current = scene;
+                rendererRef.current = renderer;
+                cameraRef.current = camera;
+                
+                // Animation loop
+                const animate = () => {
+                    if (sceneRef.current && rendererRef.current && cameraRef.current) {
+                        // Rotate camera around scene
+                        const time = Date.now() * 0.0005;
+                        cameraRef.current.position.x = Math.cos(time) * 10;
+                        cameraRef.current.position.z = Math.sin(time) * 10;
+                        cameraRef.current.lookAt(0, 0, 0);
+                        
+                        rendererRef.current.render(sceneRef.current, cameraRef.current);
+                    }
+                    requestAnimationFrame(animate);
+                };
+                animate();
+            };
+
+            // Handle file upload
+            const handleFileUpload = async (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                setUploadedFile(file);
+                setIsScanning3D(true);
+                
+                try {
+                    if (file.name.toLowerCase().endsWith('.json')) {
+                        await processJSONFile(file);
+                    } else {
+                        await processGenericFile(file);
+                    }
+                } catch (error) {
+                    console.error('File processing error:', error);
+                    alert('Error loading file: ' + error.message);
+                }
+                
+                setIsScanning3D(false);
+            };
+
+            // Process JSON file
+            const processJSONFile = async (file) => {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                
+                if (!data.roomDimensions) {
+                    throw new Error('JSON file must contain roomDimensions');
+                }
+                
+                const spatialData = {
+                    source: 'Custom JSON File',
+                    fileName: file.name,
+                    ...data,
+                    uploadedAt: new Date().toISOString()
+                };
+                
+                setSpatialData(spatialData);
+                generateSurfaces(spatialData.roomDimensions);
+                visualize3DData(spatialData);
+            };
+
+            // Process generic 3D file
+            const processGenericFile = async (file) => {
+                // Simulate extraction of room dimensions
+                const dimensions = { 
+                    width: 4.5 + Math.random() * 2, 
+                    height: 2.8 + Math.random() * 0.4, 
+                    depth: 5.5 + Math.random() * 2 
+                };
+                
+                const spatialData = {
+                    source: file.name.toLowerCase().endsWith('.usdz') ? 'iPhone LiDAR Scanner' : '3D Scan',
+                    fileName: file.name,
+                    roomDimensions: dimensions,
+                    volume: dimensions.width * dimensions.height * dimensions.depth,
+                    surfaceArea: 2 * (dimensions.width * dimensions.height + 
+                                     dimensions.width * dimensions.depth + 
+                                     dimensions.height * dimensions.depth),
+                    uploadedAt: new Date().toISOString()
+                };
+                
+                setSpatialData(spatialData);
+                generateSurfaces(dimensions);
+                visualize3DData(spatialData);
+            };
+
+            // Generate surfaces from room dimensions
+            const generateSurfaces = (dimensions) => {
+                const { width, height, depth } = dimensions;
+                const newSurfaces = [
+                    { id: 'floor', name: 'Floor', area: width * depth, normal: [0, 1, 0] },
+                    { id: 'ceiling', name: 'Ceiling', area: width * depth, normal: [0, -1, 0] },
+                    { id: 'wall_front', name: 'Front Wall', area: width * height, normal: [0, 0, -1] },
+                    { id: 'wall_back', name: 'Back Wall', area: width * height, normal: [0, 0, 1] },
+                    { id: 'wall_left', name: 'Left Wall', area: depth * height, normal: [1, 0, 0] },
+                    { id: 'wall_right', name: 'Right Wall', area: depth * height, normal: [-1, 0, 0] }
+                ];
+                setSurfaces(newSurfaces);
+            };
+
+            // Visualize 3D data
+            const visualize3DData = (data) => {
+                if (!sceneRef.current) return;
+                
+                // Clear existing room
+                const toRemove = [];
+                sceneRef.current.traverse((child) => {
+                    if (child.userData.isRoom) {
+                        toRemove.push(child);
+                    }
+                });
+                toRemove.forEach(child => sceneRef.current.remove(child));
+                
+                const { roomDimensions } = data;
+                
+                // Create room wireframe
+                const roomGeometry = new THREE.BoxGeometry(
+                    roomDimensions.width, 
+                    roomDimensions.height, 
+                    roomDimensions.depth
+                );
+                const roomMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x444444,
+                    wireframe: true,
+                    opacity: 0.3,
+                    transparent: true
+                });
+                const room = new THREE.Mesh(roomGeometry, roomMaterial);
+                room.userData.isRoom = true;
+                sceneRef.current.add(room);
+                
+                // Add colored surfaces based on materials
+                surfaces.forEach((surface, index) => {
+                    const material = selectedMaterials[surface.id];
+                    if (material) {
+                        const mat = MATERIALS[material];
+                        const surfaceMesh = createSurfaceMesh(surface, roomDimensions, mat.color);
+                        surfaceMesh.userData.isRoom = true;
+                        sceneRef.current.add(surfaceMesh);
+                    }
+                });
+                
+                // Add acoustic treatment indicators for demo
+                if (data.treatments) {
+                    data.treatments.forEach(treatment => {
+                        const geometry = new THREE.SphereGeometry(0.2);
+                        const material = new THREE.MeshPhongMaterial({
+                            color: treatment.type === 'absorption' ? 0x00ff00 : 0xff0000,
+                            emissive: treatment.type === 'absorption' ? 0x00ff00 : 0xff0000,
+                            emissiveIntensity: 0.3
+                        });
+                        const sphere = new THREE.Mesh(geometry, material);
+                        sphere.position.set(treatment.x, treatment.y, treatment.z);
+                        sphere.userData.isRoom = true;
+                        sceneRef.current.add(sphere);
+                    });
+                }
+            };
+
+            // Create surface mesh
+            const createSurfaceMesh = (surface, dimensions, color) => {
+                let geometry;
+                const material = new THREE.MeshPhongMaterial({
+                    color: new THREE.Color(color),
+                    opacity: 0.7,
+                    transparent: true,
+                    side: THREE.DoubleSide
+                });
+                
+                const { width, height, depth } = dimensions;
+                
+                switch(surface.id) {
+                    case 'floor':
+                        geometry = new THREE.PlaneGeometry(width, depth);
+                        const floorMesh = new THREE.Mesh(geometry, material);
+                        floorMesh.rotation.x = -Math.PI / 2;
+                        floorMesh.position.y = -height / 2;
+                        return floorMesh;
+                    
+                    case 'ceiling':
+                        geometry = new THREE.PlaneGeometry(width, depth);
+                        const ceilingMesh = new THREE.Mesh(geometry, material);
+                        ceilingMesh.rotation.x = Math.PI / 2;
+                        ceilingMesh.position.y = height / 2;
+                        return ceilingMesh;
+                    
+                    case 'wall_front':
+                        geometry = new THREE.PlaneGeometry(width, height);
+                        const frontMesh = new THREE.Mesh(geometry, material);
+                        frontMesh.position.z = -depth / 2;
+                        return frontMesh;
+                    
+                    case 'wall_back':
+                        geometry = new THREE.PlaneGeometry(width, height);
+                        const backMesh = new THREE.Mesh(geometry, material);
+                        backMesh.rotation.y = Math.PI;
+                        backMesh.position.z = depth / 2;
+                        return backMesh;
+                    
+                    case 'wall_left':
+                        geometry = new THREE.PlaneGeometry(depth, height);
+                        const leftMesh = new THREE.Mesh(geometry, material);
+                        leftMesh.rotation.y = Math.PI / 2;
+                        leftMesh.position.x = -width / 2;
+                        return leftMesh;
+                    
+                    case 'wall_right':
+                        geometry = new THREE.PlaneGeometry(depth, height);
+                        const rightMesh = new THREE.Mesh(geometry, material);
+                        rightMesh.rotation.y = -Math.PI / 2;
+                        rightMesh.position.x = width / 2;
+                        return rightMesh;
+                    
+                    default:
+                        return new THREE.Mesh();
+                }
+            };
+
+            // Calculate room acoustics
+            const calculateRoomAcoustics = () => {
+                if (!spatialData || !surfaces.length) return null;
+                
+                const { volume, surfaceArea } = spatialData;
+                const frequencyBands = [125, 250, 500, 1000, 2000, 4000];
+                
+                // Calculate total absorption for each frequency
+                const absorption = frequencyBands.reduce((acc, freq) => {
+                    let totalAbsorption = 0;
+                    
+                    surfaces.forEach(surface => {
+                        const materialKey = selectedMaterials[surface.id];
+                        if (materialKey && MATERIALS[materialKey]) {
+                            const material = MATERIALS[materialKey];
+                            totalAbsorption += surface.area * (material.absorption[freq] || 0.05);
+                        }
+                    });
+                    
+                    acc[freq] = totalAbsorption;
+                    return acc;
+                }, {});
+                
+                // Calculate RT60 using Sabine equation
+                const rt60 = frequencyBands.reduce((acc, freq) => {
+                    const A = absorption[freq];
+                    if (A > 0) {
+                        acc[freq] = (0.161 * volume) / A;
+                    } else {
+                        acc[freq] = 10; // Default high value
+                    }
+                    return acc;
+                }, {});
+                
+                // Calculate average RT60
+                const avgRT60 = Object.values(rt60).reduce((a, b) => a + b, 0) / frequencyBands.length;
+                
+                return {
+                    absorption,
+                    rt60,
+                    avgRT60,
+                    volume,
+                    surfaceArea
+                };
+            };
+
+            // Analyze with AI
+            const analyzeWithAI = async () => {
+                if (!audioData || !spatialData) {
+                    alert('Please record audio and scan 3D space first!');
+                    return;
+                }
+                
+                if (!apiConfig.apiKey) {
+                    alert('Please configure API key first!');
+                    return;
+                }
+                
+                setIsAnalyzing(true);
+                
+                try {
+                    // Calculate room acoustics
+                    const acoustics = calculateRoomAcoustics();
+                    
+                    // Prepare audio analysis
+                    const avgFrequencyResponse = {};
+                    EQ_FREQUENCIES.forEach(freq => {
+                        const values = audioData.map(d => 
+                            d.frequencyResponse.find(f => f.frequency === freq)?.dbSPL || 0
+                        );
+                        avgFrequencyResponse[freq] = values.reduce((a, b) => a + b, 0) / values.length;
+                    });
+                    
+                    // Prepare prompt
+                    const prompt = `You are an expert audio engineer specializing in DSP and SOFTWARE acoustic correction. Analyze this data and provide an optimal DSP processing chain.
+
+IMPORTANT: The user can ONLY use software/DSP solutions. DO NOT suggest physical treatments like panels, bass traps, carpets, etc.
+
+AUDIO DATA (Pink Noise Response):
+${JSON.stringify(avgFrequencyResponse, null, 2)}
+
+SPATIAL DATA:
+- Volume: ${spatialData.volume.toFixed(1)}m³
+- Dimensions: ${spatialData.roomDimensions.width.toFixed(1)}×${spatialData.roomDimensions.height.toFixed(1)}×${spatialData.roomDimensions.depth.toFixed(1)}m
+- RT60 per band: ${acoustics ? JSON.stringify(acoustics.rt60, null, 2) : 'Not calculated'}
+
+SURFACE MATERIALS:
+${surfaces.map(s => `${s.name}: ${MATERIALS[selectedMaterials[s.id]]?.name || 'Not assigned'}`).join('\n')}
+
+Respond ONLY with a valid JSON containing:
+{
+  "dspChain": [
+    {
+      "type": "eq|compressor|limiter|gate|reverb|delay|hpf|lpf",
+      "params": {
+        // specific parameters per type
+      },
+      "description": "brief technical description"
     }
-  }
-}
+  ],
+  "eqCurve": {
+    "20": 0, "31.5": 0, "63": 0, "125": 0, "250": 0, "500": 0, 
+    "1000": 0, "2000": 0, "3150": 0, "4000": 0, "5000": 0, 
+    "6300": 0, "8000": 0, "10000": 0, "12500": 0, "16000": 0
+  },
+  "problems": ["list of identified acoustic issues"],
+  "score": 7.5, // quality score 1-10
+  "suggestions": ["ONLY software suggestions: VST plugins, DSP techniques, room correction software, etc"]
+}`;
 
-/* -----------------------------------------------------------------
- *  React integration hook
- * ----------------------------------------------------------------- */
-const usePhaseAlignment = (apiKey) => {
-  const [phaseResult, setPhaseResult] = React.useState(null);
-  const [phaseLoading, setPhaseLoading] = React.useState(false);
+                    // Make API call
+                    const response = await callAI(prompt);
+                    
+                    if (response) {
+                        setAiAnalysis(response);
+                        if (response.dspChain) {
+                            setDspChain(response.dspChain);
+                        }
+                        if (response.eqCurve) {
+                            setEqSettings(response.eqCurve);
+                        }
+                    }
+                    
+                } catch (error) {
+                    console.error('AI analysis error:', error);
+                    // Fallback to local analysis
+                    performLocalAnalysis();
+                }
+                
+                setIsAnalyzing(false);
+            };
 
-  const runPhaseAlignment = React.useCallback(async () => {
-    if (!apiKey) return alert('Please configure an API key first.');
-    setPhaseLoading(true);
-    try {
-      const aligner = new PhaseAlignmentAI(apiKey);
-      const result  = await aligner.runAlignment();
-      setPhaseResult(result);
-    } catch (e) {
-      console.error('Phase alignment error:', e);
-      alert('Phase alignment failed. Check console.');
-    } finally {
-      setPhaseLoading(false);
-    }
-  }, [apiKey]);
+            // Call AI API
+            const callAI = async (prompt) => {
+                const { provider, apiKey, model } = apiConfig;
+                
+                try {
+                    let response;
+                    
+                    if (provider === 'openrouter') {
+                        response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${apiKey}`,
+                                'Content-Type': 'application/json',
+                                'HTTP-Referer': window.location.href,
+                                'X-Title': 'Acoustic Analyzer AI'
+                            },
+                            body: JSON.stringify({
+                                model: model,
+                                messages: [{ role: 'user', content: prompt }],
+                                temperature: 0.3,
+                                max_tokens: 2000
+                            })
+                        });
+                    } else if (provider === 'groq') {
+                        response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${apiKey}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                model: 'llama-3.3-70b-versatile',
+                                messages: [{ role: 'user', content: prompt }],
+                                temperature: 0.3,
+                                max_tokens: 2000
+                            })
+                        });
+                    }
+                    
+                    if (!response.ok) {
+                        throw new Error(`API error: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    const content = data.choices[0].message.content;
+                    
+                    // Parse JSON from response
+                    const jsonMatch = content.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        return JSON.parse(jsonMatch[0]);
+                    }
+                    
+                    throw new Error('Invalid JSON response');
+                    
+                } catch (error) {
+                    console.error('AI API error:', error);
+                    throw error;
+                }
+            };
 
-  return { phaseResult, phaseLoading, runPhaseAlignment };
-};
+            // Perform local analysis (fallback)
+            const performLocalAnalysis = () => {
+                const acoustics = calculateRoomAcoustics();
+                const avgRT60 = acoustics?.avgRT60 || 0.5;
+                
+                // Generate EQ curve based on deviations
+                const eqCurve = {};
+                EQ_FREQUENCIES.forEach(freq => {
+                    const deviation = deviationData[EQ_FREQUENCIES.indexOf(freq)] || 0;
+                    eqCurve[freq] = Math.round(-deviation * 0.7 * 10) / 10; // 70% correction
+                });
+                
+                // Generate DSP chain - Start with EQ for sub frequencies
+                const dspChain = [
+                    {
+                        type: 'eq',
+                        params: { frequency: 31.5, gain: eqCurve[31.5] || -2, q: 1.5 },
+                        description: 'Sub-bass correction (preserves sub content)'
+                    },
+                    {
+                        type: 'eq',
+                        params: { frequency: 63, gain: eqCurve[63] || -2.5, q: 1.8 },
+                        description: 'Deep resonance control'
+                    },
+                    {
+                        type: 'eq',
+                        params: { frequency: 125, gain: eqCurve[125] || -3, q: 2 },
+                        description: 'Main modal resonance correction'
+                    },
+                    {
+                        type: 'eq',
+                        params: { frequency: 250, gain: eqCurve[250] || -2, q: 1.5 },
+                        description: 'Low-mid balance adjustment'
+                    }
+                ];
+                
+                // Add HPF only if really needed (for very problematic rooms)
+                if (avgRT60 > 0.8 && eqCurve[20] < -6) {
+                    dspChain.push({
+                        type: 'hpf',
+                        params: { frequency: 25, q: 0.5 },
+                        description: 'Removes only extreme infrasonics (preserves sub)'
+                    });
+                }
+                
+                dspChain.push({
+                    type: 'compressor',
+                    params: { threshold: -12, ratio: 3, attack: 10, release: 100, knee: 2 },
+                    description: 'Overall dynamics control'
+                });
+                
+                if (avgRT60 > 0.6) {
+                    dspChain.push({
+                        type: 'reverb',
+                        params: { roomSize: 0.3, damping: 0.8, wetLevel: -20, dryLevel: 0 },
+                        description: 'Compensation for excessive reverb'
+                    });
+                }
+                
+                const analysis = {
+                    dspChain,
+                    eqCurve,
+                    problemi: [
+                        avgRT60 > 0.6 ? 'Excessive reverb time' : 'Reverb within normal range',
+                        'Possible modal resonances at low frequencies',
+                        'Primary reflections not compensated via DSP'
+                    ],
+                    score: Math.max(1, Math.min(10, 10 - avgRT60 * 3)),
+                    suggerimenti: [
+                        'Use dynamic multiband EQ for adaptive resonance control',
+                        'Apply de-esser at 4-8kHz frequencies if excessive sibilance',
+                        'Configure digital crossover for optimal sub management',
+                        avgRT60 > 0.7 ? 'Use de-reverb plugins like SPL De-Verb or Zynaptiq UNVEIL' : 'Balance linear and dynamic EQ',
+                        'Implement room correction software (Sonarworks, IK ARC, Dirac Live)',
+                        'Use multiband compressor for zone-based spectrum control',
+                        'Apply slight stereo widening above 300Hz for greater spatiality'
+                    ]
+                };
+                
+                setAiAnalysis(analysis);
+                setDspChain(analysis.dspChain);
+                setEqSettings(eqCurve);
+            };
 
-/* -----------------------------------------------------------------
- *  Minimal React component (drop-in anywhere)
- * ----------------------------------------------------------------- */
-const PhaseAlignmentPanel = ({ apiKey }) => {
-  const { phaseResult, phaseLoading, runPhaseAlignment } = usePhaseAlignment(apiKey);
+            // Export results
+            const exportResults = () => {
+                if (!aiAnalysis) return;
+                
+                const exportData = {
+                    timestamp: new Date().toISOString(),
+                    audioData: {
+                        samples: audioData.length,
+                        duration: '15 seconds',
+                        sampleRate: 48000,
+                        fftSize: 16384
+                    },
+                    spatialData,
+                    materials: surfaces.map(s => ({
+                        surface: s.name,
+                        material: MATERIALS[selectedMaterials[s.id]]?.name || 'Not assigned',
+                        area: s.area
+                    })),
+                    acoustics: calculateRoomAcoustics(),
+                    aiAnalysis,
+                    dspChain,
+                    eqSettings
+                };
+                
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+                    type: 'application/json'
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `acoustic-analysis-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
 
-  return (
-    <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 mt-6">
-      <h3 className="text-xl font-semibold mb-4 flex items-center">
-        <svg className="w-5 h-5 mr-2 text-cyan-400" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L17.18 22 12 18.77 6.82 22 7 14.14 2 9.27l6.91-.01L12 2z"/>
-        </svg>
-        Phase Alignment AI
-      </h3>
+            // Reset analysis
+            const resetAnalysis = () => {
+                setAudioData(null);
+                setSpatialData(null);
+                setAiAnalysis(null);
+                setDspChain([]);
+                setEqSettings(EQ_FREQUENCIES.reduce((acc, freq) => ({ ...acc, [freq]: 0 }), {}));
+                setMicrophoneStatus('not-initialized');
+                setUploadedFile(null);
+                setRealTimeFFT([]);
+                setDeviationData([]);
+                setSelectedMaterials({});
+                setSurfaces([]);
+                setRecordingTime(0);
+                setDemoLoaded(false);
+                
+                const fileInput = document.getElementById('file-upload');
+                if (fileInput) {
+                    fileInput.value = '';
+                }
+                
+                if (sceneRef.current) {
+                    const toRemove = [];
+                    sceneRef.current.traverse((child) => {
+                        if (child.userData.isRoom) {
+                            toRemove.push(child);
+                        }
+                    });
+                    toRemove.forEach(child => sceneRef.current.remove(child));
+                }
+            };
 
-      <button
-        onClick={runPhaseAlignment}
-        disabled={phaseLoading || !apiKey}
-        className={`w-full py-3 px-4 rounded-lg font-medium transition-all ${
-          phaseLoading || !apiKey
-            ? 'bg-gray-600 cursor-not-allowed'
-            : 'bg-cyan-600 hover:bg-cyan-700 active:scale-95'
-        }`}
-      >
-        {phaseLoading ? 'Aligning phase…' : 'Run Phase Alignment'}
-      </button>
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-white">
+                    {/* Demo Banner */}
+                    <div className="demo-banner text-center py-3 text-white font-bold text-sm">
+                        🎙️ ONLINE DEMO - Try Acoustic Space Analyzer AI Pro on GitHub Pages
+                    </div>
 
-      {phaseResult && (
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          {Object.entries(phaseResult).map(([speaker, corr]) => (
-            <div key={speaker} className="bg-gray-700/50 p-3 rounded">
-              <div className="font-bold text-white capitalize">{speaker}</div>
-              <div>Delay {corr.delay_ms.toFixed(1)} ms</div>
-              <div>Phase invert {corr.phase_invert ? 'Yes' : 'No'}</div>
-              <div>All-pass {corr.allpass_freq} Hz</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
+                    <div className="container mx-auto p-6 max-w-7xl">
+                        {/* Header */}
+                        <div className="text-center mb-8">
+                            <h1 className="text-5xl font-bold mb-2 gradient-text">
+                                Acoustic Space Analyzer AI Pro
+                            </h1>
+                            <p className="text-gray-300 text-lg">Professional acoustic analysis with AI-powered DSP Chain Generator</p>
+                            <div className="mt-4 flex items-center justify-center space-x-4">
+                                <a 
+                                    href="https://github.com/ninuxi/acoustic-space-analyzer-ai-pro" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="flex items-center bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg transition-all"
+                                >
+                                    <GithubIcon className="mr-2" />
+                                    View on GitHub
+                                </a>
+                                <div className="text-sm text-gray-400">
+                                    📡 Working online demo
+                                </div>
+                            </div>
+                        </div>
 
-/* ----------------------------------------------------------
- *  Inject the panel into the existing app
- * ---------------------------------------------------------- */
-const AcousticAnalyzerAIWithPhase = () => {
-  /* existing component body */
-  const [apiConfig] = React.useState({ apiKey: localStorage.getItem('acousticAnalyzerApiConfig') || '' });
+                        {/* API Configuration */}
+                        <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700">
+                            <h3 className="text-xl font-semibold mb-4 flex items-center">
+                                <KeyIcon className="mr-2 text-yellow-400" />
+                                AI API Configuration
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Provider</label>
+                                    <select
+                                        value={apiConfig.provider}
+                                        onChange={(e) => saveApiConfig({ ...apiConfig, provider: e.target.value })}
+                                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500"
+                                    >
+                                        <option value="openrouter">OpenRouter</option>
+                                        <option value="groq">Groq</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">API Key</label>
+                                    <input
+                                        type="password"
+                                        value={apiConfig.apiKey}
+                                        onChange={(e) => saveApiConfig({ ...apiConfig, apiKey: e.target.value })}
+                                        placeholder="sk-or-v1-..."
+                                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Model</label>
+                                    <select
+                                        value={apiConfig.model}
+                                        onChange={(e) => saveApiConfig({ ...apiConfig, model: e.target.value })}
+                                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500"
+                                    >
+                                        {apiConfig.provider === 'openrouter' ? (
+                                            <>
+                                                <option value="deepseek/deepseek-r1-distill-llama-70b">DeepSeek R1 70B</option>
+                                                <option value="meta-llama/llama-3.1-70b-instruct">Llama 3.1 70B</option>
+                                                <option value="google/gemini-flash-1.5">Gemini Flash 1.5</option>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+                                                <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+                                            </>
+                                        )}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="mt-2 text-xs text-gray-400">
+                                {apiConfig.provider === 'openrouter' ? (
+                                    <span>Get free API key at <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">openrouter.ai</a></span>
+                                ) : (
+                                    <span>Get free API key at <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">console.groq.com</a></span>
+                                )}
+                            </div>
+                        </div>
 
-  return (
-    <>
-      {/* original JSX */}
-      <AcousticAnalyzerAI />
-      {/* new panel */}
-      <PhaseAlignmentPanel apiKey={apiConfig?.apiKey || ''} />
-    </>
-  );
-};
+                        {/* Main Controls */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            {/* Audio Recording */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                                <h3 className="text-xl font-semibold mb-4 flex items-center">
+                                    <MicIcon className="mr-2 text-cyan-400" />
+                                    Audio Recording
+                                </h3>
+                                
+                                <div className="mb-4">
+                                    <div className={`text-center py-2 px-3 rounded-lg ${
+                                        microphoneStatus === 'not-initialized' ? 'bg-gray-700 text-gray-300' :
+                                        microphoneStatus === 'requesting' ? 'bg-yellow-900/30 text-yellow-400' :
+                                        microphoneStatus === 'denied' ? 'bg-red-900/30 text-red-400' :
+                                        'bg-green-900/30 text-green-400'
+                                    }`}>
+                                        {microphoneStatus === 'not-initialized' && '⚪ System not initialized'}
+                                        {microphoneStatus === 'requesting' && '⏳ Requesting permissions...'}
+                                        {microphoneStatus === 'denied' && '❌ Permissions denied'}
+                                        {microphoneStatus === 'granted' && '✅ Microphone active'}
+                                    </div>
+                                </div>
+                                
+                                <button
+                                    onClick={microphoneStatus !== 'granted' ? initializeAudio : (isRecording ? stopRecording : startRecording)}
+                                    disabled={microphoneStatus === 'requesting'}
+                                    className={`w-full py-3 px-4 rounded-lg font-medium transition-all ${
+                                        microphoneStatus !== 'granted'
+                                            ? 'bg-blue-600 hover:bg-blue-700'
+                                            : isRecording
+                                            ? 'bg-red-600 hover:bg-red-700'
+                                            : 'bg-cyan-600 hover:bg-cyan-700'
+                                    } active:scale-95`}
+                                >
+                                    {microphoneStatus !== 'granted' ? (
+                                        <div className="flex items-center justify-center">
+                                            <MicIcon className="mr-2" />
+                                            Initialize Microphone
+                                        </div>
+                                    ) : isRecording ? (
+                                        <div className="flex items-center justify-center">
+                                            <PauseIcon className="mr-2" />
+                                            Stop ({(15 - recordingTime).toFixed(1)}s)
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-center">
+                                            <PlayIcon className="mr-2" />
+                                            Record Pink Noise (15s)
+                                        </div>
+                                    )}
+                                </button>
+                                
+                                {audioData && (
+                                    <div className="mt-3 text-sm text-green-400">
+                                        ✓ {audioData.length} samples captured
+                                    </div>
+                                )}
+                                
+                                {isRecording && (
+                                    <div className="mt-3">
+                                        <div className="bg-gray-700 rounded-full h-2 overflow-hidden">
+                                            <div 
+                                                className="bg-cyan-500 h-full transition-all duration-100"
+                                                style={{ width: `${(recordingTime / 15) * 100}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
-/* Replace original render with the enhanced one */
-ReactDOM.render(<AcousticAnalyzerAIWithPhase />, document.getElementById('root'));
-</script>
+                            {/* 3D File Upload */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                                <h3 className="text-xl font-semibold mb-4 flex items-center">
+                                    <CameraIcon className="mr-2 text-purple-400" />
+                                    3D Scan
+                                </h3>
+                                
+                                {/* Demo Button */}
+                                <button
+                                    onClick={loadDemoFile}
+                                    disabled={isScanning3D}
+                                    className={`w-full py-3 px-4 rounded-lg font-medium transition-all mb-3 ${
+                                        isScanning3D
+                                            ? 'bg-purple-600 cursor-not-allowed'
+                                            : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 active:scale-95'
+                                    }`}
+                                >
+                                    {isScanning3D ? (
+                                        <div className="flex items-center justify-center">
+                                            <SettingsIcon className="animate-spin mr-2" />
+                                            Loading Demo...
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-center">
+                                            <CameraIcon className="mr-2" />
+                                            🎬 Load Garage DEMO
+                                        </div>
+                                    )}
+                                </button>
+                                
+                                <div className="text-center text-xs text-gray-400 mb-3">or</div>
+                                
+                                <input
+                                    type="file"
+                                    accept=".usdz,.ply,.obj,.json,.glb"
+                                    onChange={handleFileUpload}
+                                    disabled={isScanning3D}
+                                    className="hidden"
+                                    id="file-upload"
+                                />
+                                <label
+                                    htmlFor="file-upload"
+                                    className={`w-full py-3 px-4 rounded-lg font-medium transition-all cursor-pointer border-2 border-dashed flex items-center justify-center ${
+                                        isScanning3D
+                                            ? 'bg-purple-600 border-purple-400 cursor-not-allowed'
+                                            : 'bg-purple-600/20 border-purple-400 hover:bg-purple-600/30 active:scale-95'
+                                    }`}
+                                >
+                                    <div className="flex items-center">
+                                        <CameraIcon className="mr-2" />
+                                        Upload Personal File
+                                    </div>
+                                </label>
+                                
+                                <div className="mt-2 text-xs text-gray-400 text-center">
+                                    .usdz (iPhone) • .ply • .obj • .json • .glb
+                                </div>
+                                
+                                {spatialData && (
+                                    <div className="mt-3 text-sm text-green-400">
+                                        ✓ {spatialData.roomDimensions.width.toFixed(1)}×{spatialData.roomDimensions.height.toFixed(1)}×{spatialData.roomDimensions.depth.toFixed(1)}m
+                                        <div className="text-xs text-gray-400">
+                                            {spatialData.isDemo ? '🎬 DEMO' : uploadedFile?.name}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* AI Analysis */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                                <h3 className="text-xl font-semibold mb-4 flex items-center">
+                                    <BrainIcon className="mr-2 text-pink-400" />
+                                    AI Analysis
+                                </h3>
+                                <button
+                                    onClick={analyzeWithAI}
+                                    disabled={isAnalyzing || !audioData || !spatialData || !apiConfig.apiKey}
+                                    className={`w-full py-3 px-4 rounded-lg font-medium transition-all ${
+                                        isAnalyzing || !audioData || !spatialData || !apiConfig.apiKey
+                                            ? 'bg-gray-600 cursor-not-allowed'
+                                            : 'bg-pink-600 hover:bg-pink-700 active:scale-95'
+                                    }`}
+                                >
+                                    {isAnalyzing ? (
+                                        <div className="flex items-center justify-center">
+                                            <BrainIcon className="animate-pulse mr-2" />
+                                            Analyzing...
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-center">
+                                            <BrainIcon className="mr-2" />
+                                            Generate DSP Chain
+                                        </div>
+                                    )}
+                                </button>
+                                
+                                {!apiConfig.apiKey && (
+                                    <p className="text-xs text-red-400 mt-2 text-center">
+                                        ⚠️ Configure API key
+                                    </p>
+                                )}
+                                
+                                {!audioData && !spatialData && (
+                                    <p className="text-xs text-yellow-400 mt-2 text-center">
+                                        📝 Record audio and load 3D scan
+                                    </p>
+                                )}
+                                
+                                {aiAnalysis && (
+                                    <p className="text-sm text-green-400 mt-3">
+                                        ✓ Score: {aiAnalysis.score}/10
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Real-time FFT Visualization */}
+                        {microphoneStatus === 'granted' && (
+                            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700">
+                                <h3 className="text-xl font-semibold mb-4">Real-time Spectral Analysis</h3>
+                                <div className="grid grid-cols-8 md:grid-cols-16 gap-1">
+                                    {realTimeFFT.map((freq, index) => (
+                                        <div key={index} className="text-center">
+                                            <div className="text-xs text-gray-400 mb-1 transform -rotate-45 origin-bottom-left">
+                                                {freq.frequency >= 1000 ? `${freq.frequency/1000}k` : freq.frequency}
+                                            </div>
+                                            <div className="bg-gray-700 rounded h-32 relative overflow-hidden">
+                                                {/* Reference line */}
+                                                <div 
+                                                    className="absolute w-full border-t border-yellow-500 opacity-50"
+                                                    style={{ bottom: `${(freq.reference / 100) * 100}%` }}
+                                                />
+                                                {/* Actual level */}
+                                                <div 
+                                                    className={`absolute bottom-0 w-full transition-all duration-75 ${
+                                                        freq.deviation > 3 ? 'bg-red-500' :
+                                                        freq.deviation < -3 ? 'bg-blue-500' :
+                                                        'bg-green-500'
+                                                    }`}
+                                                    style={{ 
+                                                        height: `${Math.max(0, Math.min(100, (freq.dbSPL / 100) * 100))}%` 
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className={`text-xs mt-1 ${
+                                                Math.abs(freq.deviation) > 3 ? 'text-yellow-400' : 'text-gray-400'
+                                            }`}>
+                                                {freq.deviation > 0 ? '+' : ''}{freq.deviation.toFixed(1)}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-4 flex items-center justify-center space-x-8 text-sm">
+                                    <div className="flex items-center">
+                                        <div className="w-4 h-4 bg-yellow-500 mr-2"></div>
+                                        <span className="text-gray-400">Pink Noise Reference</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <div className="w-4 h-4 bg-green-500 mr-2"></div>
+                                        <span className="text-gray-400">OK Response (±3dB)</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <div className="w-4 h-4 bg-red-500 mr-2"></div>
+                                        <span className="text-gray-400">Excess</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <div className="w-4 h-4 bg-blue-500 mr-2"></div>
+                                        <span className="text-gray-400">Deficiency</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Material Assignment */}
+                        {surfaces.length > 0 && (
+                            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700">
+                                <h3 className="text-xl font-semibold mb-4">Material Assignment</h3>
+                                {spatialData?.isDemo && demoLoaded && (
+                                    <div className="mb-4 p-3 bg-blue-900/30 border border-blue-700/30 rounded-lg">
+                                        <p className="text-sm text-blue-300">
+                                            🎬 <strong>DEMO:</strong> Materials pre-assigned for a typical garage. You can modify them to experiment.
+                                        </p>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {surfaces.map(surface => (
+                                        <div key={surface.id} className="bg-gray-700/50 p-4 rounded-lg">
+                                            <h4 className="font-medium mb-2">{surface.name}</h4>
+                                            <p className="text-sm text-gray-400 mb-2">Area: {surface.area.toFixed(1)} m²</p>
+                                            <select
+                                                value={selectedMaterials[surface.id] || ''}
+                                                onChange={(e) => {
+                                                    setSelectedMaterials({
+                                                        ...selectedMaterials,
+                                                        [surface.id]: e.target.value
+                                                    });
+                                                    // Update 3D visualization
+                                                    if (spatialData) {
+                                                        visualize3DData(spatialData);
+                                                    }
+                                                }}
+                                                className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:outline-none focus:border-purple-500"
+                                            >
+                                                <option value="">Select material...</option>
+                                                {Object.entries(MATERIALS).map(([key, mat]) => (
+                                                    <option key={key} value={key}>{mat.name}</option>
+                                                ))}
+                                            </select>
+                                            {selectedMaterials[surface.id] && (
+                                                <div 
+                                                    className="mt-2 h-3 rounded"
+                                                    style={{ backgroundColor: MATERIALS[selectedMaterials[surface.id]].color }}
+                                                />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                {calculateRoomAcoustics() && (
+                                    <div className="mt-4 p-4 bg-gray-700/30 rounded-lg">
+                                        <p className="text-sm">
+                                            <span className="text-gray-400">Estimated average RT60:</span>{' '}
+                                            <span className="text-lg font-semibold text-cyan-400">
+                                                {calculateRoomAcoustics().avgRT60.toFixed(2)}s
+                                            </span>
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 3D Visualization and EQ */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                            {/* 3D View */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                                <h3 className="text-xl font-semibold mb-4">3D Visualization</h3>
+                                <div className="flex justify-center">
+                                    <canvas ref={canvasRef} className="border border-gray-600 rounded-lg" />
+                                </div>
+                                {spatialData && (
+                                    <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+                                        <div className="text-center">
+                                            <div className="text-2xl font-bold text-blue-400">
+                                                {spatialData.volume.toFixed(1)}
+                                            </div>
+                                            <div className="text-gray-400">m³ Volume</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-2xl font-bold text-purple-400">
+                                                {spatialData.surfaceArea.toFixed(1)}
+                                            </div>
+                                            <div className="text-gray-400">m² Surface</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-2xl font-bold text-green-400">
+                                                {(spatialData.volume / spatialData.surfaceArea).toFixed(2)}
+                                            </div>
+                                            <div className="text-gray-400">V/S Ratio</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {spatialData?.isDemo && (
+                                    <div className="mt-4 text-xs text-blue-300 text-center">
+                                        🎬 3D demo model: Empty garage with simulated acoustic treatments
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 16-band EQ */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                                <h3 className="text-xl font-semibold mb-4">16-Band Equalizer</h3>
+                                <div className="flex items-end justify-between h-48 px-4">
+                                    {EQ_FREQUENCIES.map((freq, index) => (
+                                        <div key={freq} className="flex flex-col items-center">
+                                            <div className="relative h-32 flex items-center">
+                                                <input
+                                                    type="range"
+                                                    min="-12"
+                                                    max="12"
+                                                    step="0.5"
+                                                    value={eqSettings[freq] || 0}
+                                                    onChange={(e) => setEqSettings({
+                                                        ...eqSettings,
+                                                        [freq]: parseFloat(e.target.value)
+                                                    })}
+                                                    className="eq-slider"
+                                                    style={{
+                                                        transform: 'rotate(-90deg)',
+                                                        transformOrigin: 'center',
+                                                        width: '120px',
+                                                        marginLeft: '-46px',
+                                                        marginRight: '-46px'
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="text-xs text-gray-400 mt-2 transform -rotate-45 origin-top-left">
+                                                {freq >= 1000 ? `${freq/1000}k` : freq}
+                                            </div>
+                                            <div className={`text-xs mt-1 ${
+                                                eqSettings[freq] > 0 ? 'text-green-400' : 
+                                                eqSettings[freq] < 0 ? 'text-red-400' : 
+                                                'text-gray-400'
+                                            }`}>
+                                                {eqSettings[freq] > 0 ? '+' : ''}{eqSettings[freq]}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-4 flex justify-center space-x-4">
+                                    <button
+                                        onClick={() => setEqSettings(
+                                            EQ_FREQUENCIES.reduce((acc, freq) => ({ ...acc, [freq]: 0 }), {})
+                                        )}
+                                        className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded transition-all"
+                                    >
+                                        Reset
+                                    </button>
+                                    {aiAnalysis?.eqCurve && (
+                                        <button
+                                            onClick={() => {
+                                                // Create new settings object with all frequencies
+                                                const newSettings = {};
+                                                EQ_FREQUENCIES.forEach(freq => {
+                                                    // Use AI value if available, otherwise keep current value or default to 0
+                                                    newSettings[freq] = aiAnalysis.eqCurve[freq] !== undefined 
+                                                        ? aiAnalysis.eqCurve[freq] 
+                                                        : (eqSettings[freq] || 0);
+                                                });
+                                                console.log('Applying AI EQ:', newSettings);
+                                                setEqSettings(newSettings);
+                                            }}
+                                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition-all"
+                                        >
+                                            Apply AI
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* DSP Chain Display */}
+                        {dspChain.length > 0 && (
+                            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700">
+                                <h3 className="text-xl font-semibold mb-4">Recommended DSP Chain</h3>
+                                <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-600">
+                                    <div className="flex items-center justify-between overflow-x-auto pb-4">
+                                        {dspChain.map((processor, index) => (
+                                            <React.Fragment key={index}>
+                                                <div className="flex-shrink-0">
+                                                    <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg p-4 min-w-[200px] transform hover:scale-105 transition-transform cursor-pointer">
+                                                        <div className="text-center mb-2">
+                                                            <div className="text-lg font-bold text-white">
+                                                                {DSP_PROCESSORS[processor.type]?.name || processor.type}
+                                                            </div>
+                                                            <div className="text-xs text-gray-200 opacity-80">
+                                                                {processor.type.toUpperCase()}
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1 mt-3">
+                                                            {Object.entries(processor.params).slice(0, 3).map(([param, value]) => (
+                                                                <div key={param} className="flex justify-between text-xs">
+                                                                    <span className="text-gray-200">{param}:</span>
+                                                                    <span className="font-mono text-yellow-300">
+                                                                        {typeof value === 'number' ? value.toFixed(1) : value}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-xs text-gray-400 text-center mt-2 max-w-[200px]">
+                                                        {processor.description}
+                                                    </div>
+                                                </div>
+                                                {index < dspChain.length - 1 && (
+                                                    <div className="flex-shrink-0 px-4">
+                                                        <svg width="40" height="40" viewBox="0 0 40 40">
+                                                            <defs>
+                                                                <marker
+                                                                    id="arrowhead"
+                                                                    markerWidth="10"
+                                                                    markerHeight="7"
+                                                                    refX="9"
+                                                                    refY="3.5"
+                                                                    orient="auto"
+                                                                >
+                                                                    <polygon
+                                                                        points="0 0, 10 3.5, 0 7"
+                                                                        fill="#9333ea"
+                                                                    />
+                                                                </marker>
+                                                            </defs>
+                                                            <line
+                                                                x1="5"
+                                                                y1="20"
+                                                                x2="35"
+                                                                y2="20"
+                                                                stroke="#9333ea"
+                                                                strokeWidth="3"
+                                                                markerEnd="url(#arrowhead)"
+                                                            />
+                                                        </svg>
+                                                    </div>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+                                    <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="bg-gray-800 p-3 rounded-lg text-center">
+                                            <div className="text-2xl font-bold text-cyan-400">{dspChain.length}</div>
+                                            <div className="text-xs text-gray-400">Processors</div>
+                                        </div>
+                                        <div className="bg-gray-800 p-3 rounded-lg text-center">
+                                            <div className="text-2xl font-bold text-green-400">
+                                                {dspChain.filter(p => p.type === 'eq').length}
+                                            </div>
+                                            <div className="text-xs text-gray-400">EQ Bands</div>
+                                        </div>
+                                        <div className="bg-gray-800 p-3 rounded-lg text-center">
+                                            <div className="text-2xl font-bold text-purple-400">
+                                                {dspChain.find(p => p.type === 'hpf')?.params.frequency || 'N/A'}
+                                            </div>
+                                            <div className="text-xs text-gray-400">HPF (Hz)</div>
+                                        </div>
+                                        <div className="bg-gray-800 p-3 rounded-lg text-center">
+                                            <div className="text-2xl font-bold text-yellow-400">
+                                                {aiAnalysis?.score || 'N/A'}
+                                            </div>
+                                            <div className="text-xs text-gray-400">Score</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* AI Analysis Results */}
+                        {aiAnalysis && (
+                            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700">
+                                <h3 className="text-xl font-semibold mb-4">AI Analysis Results</h3>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                                    <div className="bg-gradient-to-r from-green-900/30 to-green-800/30 p-4 rounded-lg border border-green-700/30">
+                                        <div className="text-3xl font-bold text-green-400">
+                                            {aiAnalysis.score}/10
+                                        </div>
+                                        <div className="text-sm text-gray-300">Quality Score</div>
+                                    </div>
+                                    
+                                    <div className="bg-gradient-to-r from-blue-900/30 to-blue-800/30 p-4 rounded-lg border border-blue-700/30">
+                                        <div className="text-3xl font-bold text-blue-400">
+                                            {calculateRoomAcoustics()?.avgRT60.toFixed(2)}s
+                                        </div>
+                                        <div className="text-sm text-gray-300">Avg RT60</div>
+                                    </div>
+                                    
+                                    <div className="bg-gradient-to-r from-purple-900/30 to-purple-800/30 p-4 rounded-lg border border-purple-700/30">
+                                        <div className="text-3xl font-bold text-purple-400">
+                                            {dspChain.length}
+                                        </div>
+                                        <div className="text-sm text-gray-300">DSP Processors</div>
+                                    </div>
+                                    
+                                    <div className="bg-gradient-to-r from-cyan-900/30 to-cyan-800/30 p-4 rounded-lg border border-cyan-700/30">
+                                        <div className="text-3xl font-bold text-cyan-400">
+                                            {surfaces.filter(s => selectedMaterials[s.id]).length}
+                                        </div>
+                                        <div className="text-sm text-gray-300">Treated Surfaces</div>
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <h4 className="font-semibold text-red-400 mb-2">Identified Problems:</h4>
+                                        <ul className="space-y-1 text-sm">
+                                            {aiAnalysis.problemi?.map((problema, index) => (
+                                                <li key={index} className="text-gray-300 flex items-start">
+                                                    <span className="text-red-400 mr-2">•</span>
+                                                    {problema}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-green-400 mb-2">Suggestions:</h4>
+                                        <ul className="space-y-1 text-sm">
+                                            {aiAnalysis.suggerimenti?.map((suggerimento, index) => (
+                                                <li key={index} className="text-gray-300 flex items-start">
+                                                    <span className="text-green-400 mr-2">•</span>
+                                                    {suggerimento}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Export and Reset */}
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                            <button
+                                onClick={exportResults}
+                                disabled={!aiAnalysis}
+                                className={`py-3 px-6 rounded-lg font-medium transition-all ${
+                                    !aiAnalysis
+                                        ? 'bg-gray-600 cursor-not-allowed'
+                                        : 'bg-green-600 hover:bg-green-700 active:scale-95'
+                                }`}
+                            >
+                                <DownloadIcon className="inline mr-2" />
+                                Export JSON
+                            </button>
+                            <button
+                                onClick={resetAnalysis}
+                                className="py-3 px-6 rounded-lg font-medium bg-gray-600 hover:bg-gray-700 transition-all active:scale-95"
+                            >
+                                <RotateCcwIcon className="inline mr-2" />
+                                Complete Reset
+                            </button>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="mt-12 text-center text-gray-400 text-sm">
+                            <div className="mb-4">
+                                <a 
+                                    href="https://github.com/ninuxi/acoustic-space-analyzer-ai-pro" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center hover:text-white transition-colors"
+                                >
+                                    <GithubIcon className="mr-2" />
+                                    Acoustic Space Analyzer AI Pro
+                                </a>
+                            </div>
+                            <div className="space-y-1">
+                                <p>🎚️ Professional acoustic analysis tool with AI-powered DSP chain generation</p>
+                                <p>📡 Working online demo • 🔧 Open Source </p>
+                                <p>
+                                    Technologies: React • Three.js • Web Audio API • 
+                                    <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-400 hover:underline">OpenRouter</a> • 
+                                    <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-400 hover:underline">Groq</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Render the app
+        ReactDOM.render(<AcousticAnalyzerAI />, document.getElementById('root'));
+    </script>
+</body>
+</html>
