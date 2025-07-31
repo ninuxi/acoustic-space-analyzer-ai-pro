@@ -1,6 +1,6 @@
 # Acoustic Space Analyzer AI Pro 🎚️
 
-> **[🇺🇸 English Version](README_EN.md)** | **[🌐 Try Live Demo](https://ninuxi.github.io/acoustic-space-analyzer-ai-pro)**
+> **[🇺🇸 English Version](README_EN.md)** | **[🌐 Live Demo](https://ninuxi.github.io/acoustic-space-analyzer-ai-pro)**
 
 <img width="1413" height="774" alt="Screenshot 2025-07-30 alle 16 40 03" src="https://github.com/user-attachments/assets/449980bb-71ab-4efb-ac24-6c4b58504ac7" />
 
