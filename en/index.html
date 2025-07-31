@@ -1,4 +1,22 @@
-{/* Audio Recording */}
+<option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+                                                <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+                                            </>
+                                        )}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="mt-2 text-xs text-gray-400">
+                                {apiConfig.provider === 'openrouter' ? (
+                                    <span>Get free API key at <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">openrouter.ai</a></span>
+                                ) : (
+                                    <span>Get free API key at <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">console.groq.com</a></span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Main Controls */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            {/* Audio Recording */}
                             <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
                                 <h3 className="text-xl font-semibold mb-4 flex items-center">
                                     <MicIcon className="mr-2 text-cyan-400" />
@@ -253,7 +271,87 @@
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {surfaces.map(surface => (
                                         <div key={surface.id} className="bg-gray-700/50 p-4 rounded-lg">
-                                            <h4 className="font-medium mb-2">{surface.name}</h4>
+                                            <h4 className="font-semibold text-red-400 mb-2">Identified Issues:</h4>
+                                        <ul className="space-y-1 text-sm">
+                                            {aiAnalysis.issues?.map((issue, index) => (
+                                                <li key={index} className="text-gray-300 flex items-start">
+                                                    <span className="text-red-400 mr-2">•</span>
+                                                    {issue}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-green-400 mb-2">Suggestions:</h4>
+                                        <ul className="space-y-1 text-sm">
+                                            {aiAnalysis.suggestions?.map((suggestion, index) => (
+                                                <li key={index} className="text-gray-300 flex items-start">
+                                                    <span className="text-green-400 mr-2">•</span>
+                                                    {suggestion}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Export and Reset */}
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                            <button
+                                onClick={exportResults}
+                                disabled={!aiAnalysis}
+                                className={`py-3 px-6 rounded-lg font-medium transition-all ${
+                                    !aiAnalysis
+                                        ? 'bg-gray-600 cursor-not-allowed'
+                                        : 'bg-green-600 hover:bg-green-700 active:scale-95'
+                                }`}
+                            >
+                                <DownloadIcon className="inline mr-2" />
+                                Export JSON
+                            </button>
+                            <button
+                                onClick={resetAnalysis}
+                                className="py-3 px-6 rounded-lg font-medium bg-gray-600 hover:bg-gray-700 transition-all active:scale-95"
+                            >
+                                <RotateCcwIcon className="inline mr-2" />
+                                Complete Reset
+                            </button>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="mt-12 text-center text-gray-400 text-sm">
+                            <div className="mb-4">
+                                <a 
+                                    href="https://github.com/ninuxi/acoustic-space-analyzer-ai-pro" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center hover:text-white transition-colors"
+                                >
+                                    <GithubIcon className="mr-2" />
+                                    Acoustic Space Analyzer AI Pro
+                                </a>
+                            </div>
+                            <div className="space-y-1">
+                                <p>🎚️ Professional acoustic analysis tool with AI-based DSP chain generation</p>
+                                <p>📡 Working demo online • 🔧 Open Source • 🇮🇹 Made in Italy</p>
+                                <p>
+                                    Technologies: React • Three.js • Web Audio API • 
+                                    <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-400 hover:underline">OpenRouter</a> • 
+                                    <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-400 hover:underline">Groq</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Render the app
+        ReactDOM.render(<AcousticAnalyzerAI />, document.getElementById('root'));
+    </script>
+</body>
+</html>-medium mb-2">{surface.name}</h4>
                                             <p className="text-sm text-gray-400 mb-2">Area: {surface.area.toFixed(1)} m²</p>
                                             <select
                                                 value={selectedMaterials[surface.id] || ''}
@@ -499,64 +597,71 @@
                             </div>
                         )}
 
-                        {/* Export and Reset */}
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            <button
-                                onClick={exportResults}
-                                disabled={!aiAnalysis}
-                                className={`py-3 px-6 rounded-lg font-medium transition-all ${
-                                    !aiAnalysis
-                                        ? 'bg-gray-600 cursor-not-allowed'
-                                        : 'bg-green-600 hover:bg-green-700 active:scale-95'
-                                }`}
-                            >
-                                <DownloadIcon className="inline mr-2" />
-                                Export JSON
-                            </button>
-                            <button
-                                onClick={resetAnalysis}
-                                className="py-3 px-6 rounded-lg font-medium bg-gray-600 hover:bg-gray-700 transition-all active:scale-95"
-                            >
-                                <RotateCcwIcon className="inline mr-2" />
-                                Complete Reset
-                            </button>
-                        </div>
+                        {/* AI Analysis Results */}
+                        {aiAnalysis && (
+                            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700">
+                                <h3 className="text-xl font-semibold mb-4">AI Analysis Results</h3>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                                    <div className="bg-gradient-to-r from-green-900/30 to-green-800/30 p-4 rounded-lg border border-green-700/30">
+                                        <div className="text-3xl font-bold text-green-400">
+                                            {aiAnalysis.score}/10
+                                        </div>
+                                        <div className="text-sm text-gray-300">Quality Score</div>
+                                    </div>
+                                    
+                                    <div className="bg-gradient-to-r from-blue-900/30 to-blue-800/30 p-4 rounded-lg border border-blue-700/30">
+                                        <div className="text-3xl font-bold text-blue-400">
+                                            {calculateRoomAcoustics()?.avgRT60.toFixed(2)}s
+                                        </div>
+                                        <div className="text-sm text-gray-300">Average RT60</div>
+                                    </div>
+                                    
+                                    <div className="bg-gradient-to-r from-purple-900/30 to-purple-800/30 p-4 rounded-lg border border-purple-700/30">
+                                        <div className="text-3xl font-bold text-purple-400">
+                                            {dspChain.length}
+                                        </div>
+                                        <div className="text-sm text-gray-300">DSP Processors</div>
+                                    </div>
+                                    
+                                    <div className="bg-gradient-to-r from-cyan-900/30 to-cyan-800/30 p-4 rounded-lg border border-cyan-700/30">
+                                        <div className="text-3xl font-bold text-cyan-400">
+                                            {surfaces.filter(s => selectedMaterials[s.id]).length}
+                                        </div>
+                                        <div className="text-sm text-gray-300">Treated Surfaces</div>
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <h4 className="font            // Start recording
+            const startRecording = async () => {
+                if (microphoneStatus !== 'granted') {
+                    await initializeAudio();
+                    if (microphoneStatus !== 'granted') return;
+                }
+                
+                setIsRecording(true);
+                setRecordingTime(0);
+                setAudioData([]);
+                
+                const startTime = Date.now();
+                recordingIntervalRef.current = setInterval(() => {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    setRecordingTime(elapsed);
+                    
+                    const analysis = performFFTAnalysis();
+                    if (analysis) {
+                        setAudioData(prev => [...(prev || []), analysis]);
+                    }
+                    
+                    if (elapsed >= 15) {
+                        stopRecording();
+                    }
+                }, 100); // Sample every 100ms
+            };
 
-                        {/* Footer */}
-                        <div className="mt-12 text-center text-gray-400 text-sm">
-                            <div className="mb-4">
-                                <a 
-                                    href="https://github.com/ninuxi/acoustic-space-analyzer-ai-pro" 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center hover:text-white transition-colors"
-                                >
-                                    <GithubIcon className="mr-2" />
-                                    Acoustic Space Analyzer AI Pro
-                                </a>
-                            </div>
-                            <div className="space-y-1">
-                                <p>🎚️ Professional acoustic analysis tool with AI-based DSP chain generation</p>
-                                <p>📡 Working demo online • 🔧 Open Source • 🇮🇹 Made in Italy</p>
-                                <p>
-                                    Technologies: React • Three.js • Web Audio API • 
-                                    <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-400 hover:underline">OpenRouter</a> • 
-                                    <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-400 hover:underline">Groq</a>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        // Render the app
-        ReactDOM.render(<AcousticAnalyzerAI />, document.getElementById('root'));
-    </script>
-</body>
-</html>
-
-                                    // Stop recording
+            // Stop recording
             const stopRecording = () => {
                 if (recordingIntervalRef.current) {
                     clearInterval(recordingIntervalRef.current);
@@ -1194,6 +1299,13 @@ Respond ONLY with valid JSON containing:
                                     <GithubIcon className="mr-2" />
                                     View on GitHub
                                 </a>
+                                <a 
+                                    href="../" 
+                                    className="flex items-center bg-blue-800 hover:bg-blue-700 px-4 py-2 rounded-lg transition-all"
+                                >
+                                    <LanguageIcon className="mr-2" />
+                                    🇮🇹 Versione Italiana
+                                </a>
                                 <div className="text-sm text-gray-400">
                                     📡 Working demo online
                                 </div>
@@ -1243,26 +1355,7 @@ Respond ONLY with valid JSON containing:
                                             </>
                                         ) : (
                                             <>
-                                                <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
-                                                <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
-                                            </>
-                                        )}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="mt-2 text-xs text-gray-400">
-                                {apiConfig.provider === 'openrouter' ? (
-                                    <span>Get free API key at <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">openrouter.ai</a></span>
-                                ) : (
-                                    <span>Get free API key at <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">console.groq.com</a></span>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Main Controls */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                            {/* Audio Recording */}
-                            <div className="bg-gray<!DOCTYPE html>
+                                                <option value="<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1496,6 +1589,14 @@ Respond ONLY with valid JSON containing:
         const GithubIcon = ({ size = 20, className = "" }) => (
             <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
                 <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+        );
+
+        const LanguageIcon = ({ size = 20, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
             </svg>
         );
 
@@ -1788,28 +1889,3 @@ Respond ONLY with valid JSON containing:
                 if (microphoneStatus !== 'granted') {
                     await initializeAudio();
                     if (microphoneStatus !== 'granted') return;
-                }
-                
-                setIsRecording(true);
-                setRecordingTime(0);
-                setAudioData([]);
-                
-                const startTime = Date.now();
-                recordingIntervalRef.current = setInterval(() => {
-                    const elapsed = (Date.now() - startTime) / 1000;
-                    setRecordingTime(elapsed);
-                    
-                    const analysis = performFFTAnalysis();
-                    if (analysis) {
-                        setAudioData(prev => [...(prev || []), analysis]);
-                    }
-                    
-                    if (elapsed >= 15) {
-                        stopRecording();
-                    }
-                }, 100); // Sample every 100ms
-            };
-
-            // Stop recording
-            const stopRecording = () => {
-                if (recordingIntervalRef.current) {
