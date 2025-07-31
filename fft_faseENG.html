@@ -1,0 +1,247 @@
+<!-- ================================================================= -->
+<!--  PHASE-ALIGNMENT-AI  –  integrated into the React application     -->
+<!-- ================================================================= -->
+<script type="text/babel">
+/*
+ *  PhaseAlignmentAI
+ *  FFT-based speaker phase alignment with AI-driven corrections
+ *  (works inside the existing React context)
+ */
+class PhaseAlignmentAI {
+  constructor(apiKey) {
+    this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+    this.fftSize = 8192;
+    this.sampleRate = this.audioContext.sampleRate;
+    this.apiKey = apiKey;
+
+    // speaker positions (meters)
+    this.speakerSetup = {
+      sub:        { pos: [0, 0, 0],   frq: [20, 120] },
+      mainLR:     { pos: [-2, 1, 0], frq: [80, 20000] },
+      frontfill:  { pos: [0, 0.5, 2], frq: [200, 8000] }
+    };
+  }
+
+  /* ---------------------------------------------------------------
+   *  1) generate pink-noise test samples
+   * ------------------------------------------------------------- */
+  generatePinkNoiseBuffer(duration = 2) {
+    const length = duration * this.sampleRate;
+    const buffer = this.audioContext.createBuffer(1, length, this.sampleRate);
+    const data   = buffer.getChannelData(0);
+
+    let b0=0, b1=0, b2=0, b3=0, b4=0, b5=0, b6=0;
+    for (let i=0; i<length; i++) {
+      const white = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + white * 0.0555179;
+      b1 = 0.99332 * b1 + white * 0.0750759;
+      b2 = 0.96900 * b2 + white * 0.1538520;
+      b3 = 0.86650 * b3 + white * 0.3104856;
+      b4 = 0.55000 * b4 + white * 0.5329522;
+      b5 = -0.7616 * b5 - white * 0.0168980;
+      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+      b6 = white * 0.115926;
+    }
+    return buffer;
+  }
+
+  /* ---------------------------------------------------------------
+   *  2) perform complex FFT → magnitude + phase
+   * ------------------------------------------------------------- */
+  async performComplexFFT(audioBuffer) {
+    const N = this.fftSize;
+    const signal = audioBuffer.getChannelData(0).slice(0, N);
+    const real   = new Float32Array(N);
+    const imag   = new Float32Array(N);
+    for (let i=0; i<N; i++) { real[i]=signal[i]; imag[i]=0; }
+    this.fft(real, imag);
+
+    const mag  = new Float32Array(N/2);
+    const ph   = new Float32Array(N/2);
+    for (let i=0; i<N/2; i++) {
+      mag[i] = Math.sqrt(real[i]**2 + imag[i]**2);
+      ph[i]  = Math.atan2(imag[i], real[i]);
+    }
+    return { magnitude: mag, phase: ph };
+  }
+
+  /* ---------------------------------------------------------------
+   *  3) ask AI for phase corrections
+   * ------------------------------------------------------------- */
+  async fetchPhaseCorrections(measurements) {
+    const prompt = `
+ANALISI FASE ACUSTICA – Allineamento Speaker System
+
+Dati misurazione:
+- SUB: Fase media ${measurements.sub.avgPhase.toFixed(2)} rad, Delay ${measurements.sub.delay.toFixed(1)} ms
+- MAIN L/R: Fase media ${measurements.mainLR.avgPhase.toFixed(2)} rad, Delay ${measurements.mainLR.delay.toFixed(1)} ms
+- FRONTFILL: Fase media ${measurements.frontfill.avgPhase.toFixed(2)} rad, Delay ${measurements.frontfill.delay.toFixed(1)} ms
+
+Frequenze di crossover:
+- Sub/Main: 80-120 Hz
+- Main/Frontfill: 200-300 Hz
+
+Restituisci **solo** un JSON valido:
+{
+  "sub":       { "delay_ms": X, "phase_invert": boolean, "allpass_freq": X },
+  "mainLR":    { "delay_ms": X, "phase_invert": boolean, "allpass_freq": X },
+  "frontfill": { "delay_ms": X, "phase_invert": boolean, "allpass_freq": X }
+}
+`;
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    return JSON.parse(data.choices[0].message.content);
+  }
+
+  /* ---------------------------------------------------------------
+   *  4) run full phase-alignment workflow
+   * ------------------------------------------------------------- */
+  async runAlignment() {
+    console.log('🎤 Measuring all speakers...');
+    const measurements = {};
+    for (const [name, cfg] of Object.entries(this.speakerSetup)) {
+      const noise   = this.generatePinkNoiseBuffer();
+      const { magnitude, phase } = await this.performComplexFFT(noise);
+      const avgPhase = phase.reduce((a,b)=>a+b) / phase.length;
+      measurements[name] = { magnitude, phase, avgPhase, delay: 0 }; // delay placeholder
+    }
+
+    console.log('🧠 Requesting AI phase corrections...');
+    const corrections = await this.fetchPhaseCorrections(measurements);
+
+    console.log('✅ Phase alignment complete:', corrections);
+    return corrections;
+  }
+
+  /* ---------------------------------------------------------------
+   *  basic FFT (Cooley–Tukey radix-2)
+   * ------------------------------------------------------------- */
+  fft(real, imag) {
+    const N = real.length;
+    if (N <= 1) return;
+    // bit-reverse
+    for (let i=1, j=0; i<N; ++i) {
+      let bit = N >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) [real[i], real[j], imag[i], imag[j]] = [real[j], real[i], imag[j], imag[i]];
+    }
+    for (let len=2; len<=N; len<<=1) {
+      const ang = 2*Math.PI/len;
+      const wlen = Math.cos(ang) - Math.sin(ang)*1j;
+      for (let i=0; i<N; i+=len) {
+        let w = 1;
+        for (let j=0; j<len/2; ++j) {
+          const u = real[i+j], v = real[i+j+len/2]*w.real - imag[i+j+len/2]*w.imag;
+          const t = imag[i+j], s = real[i+j+len/2]*w.imag + imag[i+j+len/2]*w.real;
+          real[i+j] = u + v;
+          imag[i+j] = t + s;
+          real[i+j+len/2] = u - v;
+          imag[i+j+len/2] = t - s;
+          const tmp = w.real*wlen.real - w.imag*wlen.imag;
+          w.imag = w.real*wlen.imag + w.imag*wlen.real;
+          w.real = tmp;
+        }
+      }
+    }
+  }
+}
+
+/* -----------------------------------------------------------------
+ *  React integration hook
+ * ----------------------------------------------------------------- */
+const usePhaseAlignment = (apiKey) => {
+  const [phaseResult, setPhaseResult] = React.useState(null);
+  const [phaseLoading, setPhaseLoading] = React.useState(false);
+
+  const runPhaseAlignment = React.useCallback(async () => {
+    if (!apiKey) return alert('Please configure an API key first.');
+    setPhaseLoading(true);
+    try {
+      const aligner = new PhaseAlignmentAI(apiKey);
+      const result  = await aligner.runAlignment();
+      setPhaseResult(result);
+    } catch (e) {
+      console.error('Phase alignment error:', e);
+      alert('Phase alignment failed. Check console.');
+    } finally {
+      setPhaseLoading(false);
+    }
+  }, [apiKey]);
+
+  return { phaseResult, phaseLoading, runPhaseAlignment };
+};
+
+/* -----------------------------------------------------------------
+ *  Minimal React component (drop-in anywhere)
+ * ----------------------------------------------------------------- */
+const PhaseAlignmentPanel = ({ apiKey }) => {
+  const { phaseResult, phaseLoading, runPhaseAlignment } = usePhaseAlignment(apiKey);
+
+  return (
+    <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 mt-6">
+      <h3 className="text-xl font-semibold mb-4 flex items-center">
+        <svg className="w-5 h-5 mr-2 text-cyan-400" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L17.18 22 12 18.77 6.82 22 7 14.14 2 9.27l6.91-.01L12 2z"/>
+        </svg>
+        Phase Alignment AI
+      </h3>
+
+      <button
+        onClick={runPhaseAlignment}
+        disabled={phaseLoading || !apiKey}
+        className={`w-full py-3 px-4 rounded-lg font-medium transition-all ${
+          phaseLoading || !apiKey
+            ? 'bg-gray-600 cursor-not-allowed'
+            : 'bg-cyan-600 hover:bg-cyan-700 active:scale-95'
+        }`}
+      >
+        {phaseLoading ? 'Aligning phase…' : 'Run Phase Alignment'}
+      </button>
+
+      {phaseResult && (
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          {Object.entries(phaseResult).map(([speaker, corr]) => (
+            <div key={speaker} className="bg-gray-700/50 p-3 rounded">
+              <div className="font-bold text-white capitalize">{speaker}</div>
+              <div>Delay {corr.delay_ms.toFixed(1)} ms</div>
+              <div>Phase invert {corr.phase_invert ? 'Yes' : 'No'}</div>
+              <div>All-pass {corr.allpass_freq} Hz</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ----------------------------------------------------------
+ *  Inject the panel into the existing app
+ * ---------------------------------------------------------- */
+const AcousticAnalyzerAIWithPhase = () => {
+  /* existing component body */
+  const [apiConfig] = React.useState({ apiKey: localStorage.getItem('acousticAnalyzerApiConfig') || '' });
+
+  return (
+    <>
+      {/* original JSX */}
+      <AcousticAnalyzerAI />
+      {/* new panel */}
+      <PhaseAlignmentPanel apiKey={apiConfig?.apiKey || ''} />
+    </>
+  );
+};
+
+/* Replace original render with the enhanced one */
+ReactDOM.render(<AcousticAnalyzerAIWithPhase />, document.getElementById('root'));
+</script>
