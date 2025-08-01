@@ -1,3 +1,9 @@
+**English (Main)** – [Italiano](./index-ITA.html)
+
+A professional acoustic-analysis tool powered by AI, 3-D scanning and DSP.
+
+🎙️ **Live Demo**: https://ninuxi.github.io/acoustic-space-analyzer-ai-pro
+
 # Acoustic Space Analyzer AI Pro 🎚️
 
 > **[🇺🇸 English Version](README_EN.md)** | **[🌐 Live Demo](https://ninuxi.github.io/acoustic-space-analyzer-ai-pro)**
