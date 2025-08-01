@@ -1,4 +1,4 @@
-**English (Main)** – [Italiano](./index-ita.html)
+**English (Main)** – [Italiano](./index_ita.html)
 
 A professional acoustic-analysis tool powered by AI, 3-D scanning and DSP.
 
