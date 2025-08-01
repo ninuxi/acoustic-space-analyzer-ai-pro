@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -235,18 +235,18 @@
             </svg>
         );
 
-        // Material database with Italian names
+        // Material database with English names
         const MATERIALS = {
-            'cartongesso': { name: 'Cartongesso', absorption: { 125: 0.29, 250: 0.10, 500: 0.05, 1000: 0.04, 2000: 0.07, 4000: 0.09 }, color: '#e0e0e0' },
-            'legno': { name: 'Legno massello', absorption: { 125: 0.15, 250: 0.11, 500: 0.10, 1000: 0.07, 2000: 0.06, 4000: 0.07 }, color: '#8b4513' },
-            'vetro': { name: 'Vetro', absorption: { 125: 0.35, 250: 0.25, 500: 0.18, 1000: 0.12, 2000: 0.07, 4000: 0.04 }, color: '#87ceeb' },
-            'cemento': { name: 'Cemento', absorption: { 125: 0.01, 250: 0.01, 500: 0.02, 1000: 0.02, 2000: 0.03, 4000: 0.03 }, color: '#808080' },
-            'moquette': { name: 'Moquette', absorption: { 125: 0.08, 250: 0.24, 500: 0.57, 1000: 0.69, 2000: 0.71, 4000: 0.73 }, color: '#8b0000' },
-            'tenda_pesante': { name: 'Tenda pesante', absorption: { 125: 0.14, 250: 0.35, 500: 0.55, 1000: 0.72, 2000: 0.70, 4000: 0.65 }, color: '#4b0082' },
-            'pannello_fonoassorbente': { name: 'Pannello fonoassorbente', absorption: { 125: 0.20, 250: 0.65, 500: 0.85, 1000: 0.95, 2000: 0.95, 4000: 0.90 }, color: '#2f4f4f' },
-            'intonaco': { name: 'Intonaco', absorption: { 125: 0.02, 250: 0.02, 500: 0.03, 1000: 0.04, 2000: 0.05, 4000: 0.05 }, color: '#f5f5dc' },
-            'mattone': { name: 'Mattone', absorption: { 125: 0.03, 250: 0.03, 500: 0.03, 1000: 0.04, 2000: 0.05, 4000: 0.07 }, color: '#a52a2a' },
-            'parquet': { name: 'Parquet', absorption: { 125: 0.04, 250: 0.04, 500: 0.07, 1000: 0.06, 2000: 0.06, 4000: 0.07 }, color: '#daa520' }
+            'plasterboard': { name: 'Plasterboard', absorption: { 125: 0.29, 250: 0.10, 500: 0.05, 1000: 0.04, 2000: 0.07, 4000: 0.09 }, color: '#e0e0e0' },
+            'solid_wood': { name: 'Solid Wood', absorption: { 125: 0.15, 250: 0.11, 500: 0.10, 1000: 0.07, 2000: 0.06, 4000: 0.07 }, color: '#8b4513' },
+            'glass': { name: 'Glass', absorption: { 125: 0.35, 250: 0.25, 500: 0.18, 1000: 0.12, 2000: 0.07, 4000: 0.04 }, color: '#87ceeb' },
+            'concrete': { name: 'Concrete', absorption: { 125: 0.01, 250: 0.01, 500: 0.02, 1000: 0.02, 2000: 0.03, 4000: 0.03 }, color: '#808080' },
+            'carpet': { name: 'Carpet', absorption: { 125: 0.08, 250: 0.24, 500: 0.57, 1000: 0.69, 2000: 0.71, 4000: 0.73 }, color: '#8b0000' },
+            'heavy_curtain': { name: 'Heavy Curtain', absorption: { 125: 0.14, 250: 0.35, 500: 0.55, 1000: 0.72, 2000: 0.70, 4000: 0.65 }, color: '#4b0082' },
+            'acoustic_panel': { name: 'Acoustic Panel', absorption: { 125: 0.20, 250: 0.65, 500: 0.85, 1000: 0.95, 2000: 0.95, 4000: 0.90 }, color: '#2f4f4f' },
+            'plaster': { name: 'Plaster', absorption: { 125: 0.02, 250: 0.02, 500: 0.03, 1000: 0.04, 2000: 0.05, 4000: 0.05 }, color: '#f5f5dc' },
+            'brick': { name: 'Brick', absorption: { 125: 0.03, 250: 0.03, 500: 0.03, 1000: 0.04, 2000: 0.05, 4000: 0.07 }, color: '#a52a2a' },
+            'hardwood': { name: 'Hardwood Floor', absorption: { 125: 0.04, 250: 0.04, 500: 0.07, 1000: 0.06, 2000: 0.06, 4000: 0.07 }, color: '#daa520' }
         };
 
         // 16-band frequencies for equalizer
@@ -254,14 +254,14 @@
 
         // DSP Processors for chain
         const DSP_PROCESSORS = {
-            eq: { name: 'Equalizzatore Parametrico', params: ['frequency', 'gain', 'q'] },
-            compressor: { name: 'Compressore', params: ['threshold', 'ratio', 'attack', 'release', 'knee'] },
+            eq: { name: 'Parametric EQ', params: ['frequency', 'gain', 'q'] },
+            compressor: { name: 'Compressor', params: ['threshold', 'ratio', 'attack', 'release', 'knee'] },
             limiter: { name: 'Limiter', params: ['threshold', 'release', 'lookahead'] },
             gate: { name: 'Noise Gate', params: ['threshold', 'attack', 'hold', 'release'] },
-            reverb: { name: 'Riverbero', params: ['roomSize', 'damping', 'wetLevel', 'dryLevel'] },
+            reverb: { name: 'Reverb', params: ['roomSize', 'damping', 'wetLevel', 'dryLevel'] },
             delay: { name: 'Delay', params: ['time', 'feedback', 'mix'] },
-            hpf: { name: 'Filtro Passa-Alto', params: ['frequency', 'q'] },
-            lpf: { name: 'Filtro Passa-Basso', params: ['frequency', 'q'] }
+            hpf: { name: 'High-pass Filter', params: ['frequency', 'q'] },
+            lpf: { name: 'Low-pass Filter', params: ['frequency', 'q'] }
         };
 
         const AcousticAnalyzerAI = () => {
@@ -383,12 +383,12 @@
                     
                     // Auto-assign realistic materials for garage
                     const demoMaterials = {
-                        'floor': 'cemento',
-                        'ceiling': 'cartongesso',
-                        'wall_front': 'cemento',
-                        'wall_back': 'cemento', 
-                        'wall_left': 'mattone',
-                        'wall_right': 'mattone'
+                        'floor': 'concrete',
+                        'ceiling': 'plasterboard',
+                        'wall_front': 'concrete',
+                        'wall_back': 'concrete', 
+                        'wall_left': 'brick',
+                        'wall_right': 'brick'
                     };
                     setSelectedMaterials(demoMaterials);
                     
@@ -396,7 +396,7 @@
                     
                 } catch (error) {
                     console.error('Demo loading error:', error);
-                    alert('Errore nel caricamento della demo: ' + error.message);
+                    alert('Error loading demo: ' + error.message);
                 }
                 
                 setIsScanning3D(false);
@@ -445,9 +445,9 @@
                     setMicrophoneStatus('denied');
                     
                     if (error.name === 'NotAllowedError') {
-                        alert('Permessi microfono negati. Clicca sull\'icona del microfono nella barra indirizzi e consenti l\'accesso.');
+                        alert('Microphone permissions denied. Click the microphone icon in the address bar and allow access.');
                     } else {
-                        alert('Errore audio: ' + error.message);
+                        alert('Audio error: ' + error.message);
                     }
                 }
             };
@@ -633,7 +633,7 @@
                     }
                 } catch (error) {
                     console.error('File processing error:', error);
-                    alert('Errore nel caricamento: ' + error.message);
+                    alert('Error loading file: ' + error.message);
                 }
                 
                 setIsScanning3D(false);
@@ -645,11 +645,11 @@
                 const data = JSON.parse(text);
                 
                 if (!data.roomDimensions) {
-                    throw new Error('File JSON deve contenere roomDimensions');
+                    throw new Error('JSON file must contain roomDimensions');
                 }
                 
                 const spatialData = {
-                    source: 'File JSON Custom',
+                    source: 'Custom JSON File',
                     fileName: file.name,
                     ...data,
                     uploadedAt: new Date().toISOString()
@@ -670,7 +670,7 @@
                 };
                 
                 const spatialData = {
-                    source: file.name.toLowerCase().endsWith('.usdz') ? 'iPhone LiDAR Scanner' : 'Scansione 3D',
+                    source: file.name.toLowerCase().endsWith('.usdz') ? 'iPhone LiDAR Scanner' : '3D Scan',
                     fileName: file.name,
                     roomDimensions: dimensions,
                     volume: dimensions.width * dimensions.height * dimensions.depth,
@@ -689,12 +689,12 @@
             const generateSurfaces = (dimensions) => {
                 const { width, height, depth } = dimensions;
                 const newSurfaces = [
-                    { id: 'floor', name: 'Pavimento', area: width * depth, normal: [0, 1, 0] },
-                    { id: 'ceiling', name: 'Soffitto', area: width * depth, normal: [0, -1, 0] },
-                    { id: 'wall_front', name: 'Parete frontale', area: width * height, normal: [0, 0, -1] },
-                    { id: 'wall_back', name: 'Parete posteriore', area: width * height, normal: [0, 0, 1] },
-                    { id: 'wall_left', name: 'Parete sinistra', area: depth * height, normal: [1, 0, 0] },
-                    { id: 'wall_right', name: 'Parete destra', area: depth * height, normal: [-1, 0, 0] }
+                    { id: 'floor', name: 'Floor', area: width * depth, normal: [0, 1, 0] },
+                    { id: 'ceiling', name: 'Ceiling', area: width * depth, normal: [0, -1, 0] },
+                    { id: 'wall_front', name: 'Front Wall', area: width * height, normal: [0, 0, -1] },
+                    { id: 'wall_back', name: 'Back Wall', area: width * height, normal: [0, 0, 1] },
+                    { id: 'wall_left', name: 'Left Wall', area: depth * height, normal: [1, 0, 0] },
+                    { id: 'wall_right', name: 'Right Wall', area: depth * height, normal: [-1, 0, 0] }
                 ];
                 setSurfaces(newSurfaces);
             };
@@ -866,12 +866,12 @@
             // Analyze with AI
             const analyzeWithAI = async () => {
                 if (!audioData || !spatialData) {
-                    alert('Effettua prima la registrazione audio e la scansione 3D!');
+                    alert('Please record audio and scan 3D space first!');
                     return;
                 }
                 
                 if (!apiConfig.apiKey) {
-                    alert('Configura prima la chiave API!');
+                    alert('Please configure API key first!');
                     return;
                 }
                 
@@ -891,30 +891,30 @@
                     });
                     
                     // Prepare prompt
-                    const prompt = `Sei un esperto ingegnere del suono specializzato in DSP e correzione acustica SOFTWARE. Analizza questi dati e fornisci una catena di processamento DSP ottimale.
+                    const prompt = `You are an expert audio engineer specializing in DSP and SOFTWARE acoustic correction. Analyze this data and provide an optimal DSP processing chain.
 
-IMPORTANTE: L'utente può usare SOLO soluzioni software/DSP. NON suggerire trattamenti fisici come pannelli, bass trap, tappeti, etc.
+IMPORTANT: The user can ONLY use software/DSP solutions. DO NOT suggest physical treatments like panels, bass traps, carpets, etc.
 
-DATI AUDIO (Pink Noise Response):
+AUDIO DATA (Pink Noise Response):
 ${JSON.stringify(avgFrequencyResponse, null, 2)}
 
-DATI SPAZIALI:
+SPATIAL DATA:
 - Volume: ${spatialData.volume.toFixed(1)}m³
-- Dimensioni: ${spatialData.roomDimensions.width.toFixed(1)}x${spatialData.roomDimensions.height.toFixed(1)}x${spatialData.roomDimensions.depth.toFixed(1)}m
-- RT60 per banda: ${acoustics ? JSON.stringify(acoustics.rt60, null, 2) : 'Non calcolato'}
+- Dimensions: ${spatialData.roomDimensions.width.toFixed(1)}×${spatialData.roomDimensions.height.toFixed(1)}×${spatialData.roomDimensions.depth.toFixed(1)}m
+- RT60 per band: ${acoustics ? JSON.stringify(acoustics.rt60, null, 2) : 'Not calculated'}
 
-MATERIALI SUPERFICI:
-${surfaces.map(s => `${s.name}: ${MATERIALS[selectedMaterials[s.id]]?.name || 'Non assegnato'}`).join('\n')}
+SURFACE MATERIALS:
+${surfaces.map(s => `${s.name}: ${MATERIALS[selectedMaterials[s.id]]?.name || 'Not assigned'}`).join('\n')}
 
-Rispondi SOLO con un JSON valido contenente:
+Respond ONLY with a valid JSON containing:
 {
   "dspChain": [
     {
       "type": "eq|compressor|limiter|gate|reverb|delay|hpf|lpf",
       "params": {
-        // parametri specifici per tipo
+        // specific parameters per type
       },
-      "description": "breve descrizione tecnica"
+      "description": "brief technical description"
     }
   ],
   "eqCurve": {
@@ -922,9 +922,9 @@ Rispondi SOLO con un JSON valido contenente:
     "1000": 0, "2000": 0, "3150": 0, "4000": 0, "5000": 0, 
     "6300": 0, "8000": 0, "10000": 0, "12500": 0, "16000": 0
   },
-  "problemi": ["lista problemi acustici identificati"],
-  "score": 7.5, // score qualità 1-10
-  "suggerimenti": ["SOLO suggerimenti SOFTWARE: plugin VST, tecniche DSP, room correction software, etc"]
+  "problems": ["list of identified acoustic issues"],
+  "score": 7.5, // quality score 1-10
+  "suggestions": ["ONLY software suggestions: VST plugins, DSP techniques, room correction software, etc"]
 }`;
 
                     // Make API call
@@ -1026,22 +1026,22 @@ Rispondi SOLO con un JSON valido contenente:
                     {
                         type: 'eq',
                         params: { frequency: 31.5, gain: eqCurve[31.5] || -2, q: 1.5 },
-                        description: 'Correzione sub-bass (mantiene contenuto sub)'
+                        description: 'Sub-bass correction (preserves sub content)'
                     },
                     {
                         type: 'eq',
                         params: { frequency: 63, gain: eqCurve[63] || -2.5, q: 1.8 },
-                        description: 'Controllo risonanze profonde'
+                        description: 'Deep resonance control'
                     },
                     {
                         type: 'eq',
                         params: { frequency: 125, gain: eqCurve[125] || -3, q: 2 },
-                        description: 'Correzione risonanza modale principale'
+                        description: 'Main modal resonance correction'
                     },
                     {
                         type: 'eq',
                         params: { frequency: 250, gain: eqCurve[250] || -2, q: 1.5 },
-                        description: 'Bilanciamento medio-bassi'
+                        description: 'Low-mid balance adjustment'
                     }
                 ];
                 
@@ -1050,21 +1050,21 @@ Rispondi SOLO con un JSON valido contenente:
                     dspChain.push({
                         type: 'hpf',
                         params: { frequency: 25, q: 0.5 },
-                        description: 'Rimuove solo infrasuoni estremi (preserva sub)'
+                        description: 'Removes only extreme infrasonics (preserves sub)'
                     });
                 }
                 
                 dspChain.push({
                     type: 'compressor',
                     params: { threshold: -12, ratio: 3, attack: 10, release: 100, knee: 2 },
-                    description: 'Controllo dinamica generale'
+                    description: 'Overall dynamics control'
                 });
                 
                 if (avgRT60 > 0.6) {
                     dspChain.push({
                         type: 'reverb',
                         params: { roomSize: 0.3, damping: 0.8, wetLevel: -20, dryLevel: 0 },
-                        description: 'Compensazione riverbero eccessivo'
+                        description: 'Compensation for excessive reverb'
                     });
                 }
                 
@@ -1072,19 +1072,19 @@ Rispondi SOLO con un JSON valido contenente:
                     dspChain,
                     eqCurve,
                     problemi: [
-                        avgRT60 > 0.6 ? 'Tempo di riverbero eccessivo' : 'Riverbero nella norma',
-                        'Possibili risonanze modali a basse frequenze',
-                        'Riflessioni primarie non compensate via DSP'
+                        avgRT60 > 0.6 ? 'Excessive reverb time' : 'Reverb within normal range',
+                        'Possible modal resonances at low frequencies',
+                        'Primary reflections not compensated via DSP'
                     ],
                     score: Math.max(1, Math.min(10, 10 - avgRT60 * 3)),
                     suggerimenti: [
-                        'Usa EQ dinamico multibanda per controllo adattivo delle risonanze',
-                        'Applica un De-esser alle frequenze 4-8kHz se sibilanti eccessive',
-                        'Configura crossover digitale per gestione ottimale dei sub',
-                        avgRT60 > 0.7 ? 'Usa plugin di de-riverbero come SPL De-Verb o Zynaptiq UNVEIL' : 'Bilancia EQ lineare e dinamico',
-                        'Implementa room correction software (Sonarworks, IK ARC, Dirac Live)',
-                        'Usa compressore multibanda per controllo zonale dello spettro',
-                        'Applica slight stereo widening sopra 300Hz per maggiore spazialità'
+                        'Use dynamic multiband EQ for adaptive resonance control',
+                        'Apply de-esser at 4-8kHz frequencies if excessive sibilance',
+                        'Configure digital crossover for optimal sub management',
+                        avgRT60 > 0.7 ? 'Use de-reverb plugins like SPL De-Verb or Zynaptiq UNVEIL' : 'Balance linear and dynamic EQ',
+                        'Implement room correction software (Sonarworks, IK ARC, Dirac Live)',
+                        'Use multiband compressor for zone-based spectrum control',
+                        'Apply slight stereo widening above 300Hz for greater spatiality'
                     ]
                 };
                 
@@ -1108,7 +1108,7 @@ Rispondi SOLO con un JSON valido contenente:
                     spatialData,
                     materials: surfaces.map(s => ({
                         surface: s.name,
-                        material: MATERIALS[selectedMaterials[s.id]]?.name || 'Non assegnato',
+                        material: MATERIALS[selectedMaterials[s.id]]?.name || 'Not assigned',
                         area: s.area
                     })),
                     acoustics: calculateRoomAcoustics(),
@@ -1164,7 +1164,7 @@ Rispondi SOLO con un JSON valido contenente:
                 <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-white">
                     {/* Demo Banner */}
                     <div className="demo-banner text-center py-3 text-white font-bold text-sm">
-                        🎙️ DEMO ONLINE - Prova l'Acoustic Space Analyzer AI Pro su GitHub Pages
+                        🎙️ ONLINE DEMO - Try Acoustic Space Analyzer AI Pro on GitHub Pages
                     </div>
 
                     <div className="container mx-auto p-6 max-w-7xl">
@@ -1173,7 +1173,7 @@ Rispondi SOLO con un JSON valido contenente:
                             <h1 className="text-5xl font-bold mb-2 gradient-text">
                                 Acoustic Space Analyzer AI Pro
                             </h1>
-                            <p className="text-gray-300 text-lg">Analisi acustica professionale con DSP Chain Generator</p>
+                            <p className="text-gray-300 text-lg">Professional acoustic analysis with AI-powered DSP Chain Generator</p>
                             <div className="mt-4 flex items-center justify-center space-x-4">
                                 <a 
                                     href="https://github.com/ninuxi/acoustic-space-analyzer-ai-pro" 
@@ -1182,10 +1182,10 @@ Rispondi SOLO con un JSON valido contenente:
                                     className="flex items-center bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg transition-all"
                                 >
                                     <GithubIcon className="mr-2" />
-                                    Visualizza su GitHub
+                                    View on GitHub
                                 </a>
                                 <div className="text-sm text-gray-400">
-                                    📡 Demo funzionante online
+                                    📡 Working online demo
                                 </div>
                             </div>
                         </div>
@@ -1194,7 +1194,7 @@ Rispondi SOLO con un JSON valido contenente:
                         <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700">
                             <h3 className="text-xl font-semibold mb-4 flex items-center">
                                 <KeyIcon className="mr-2 text-yellow-400" />
-                                Configurazione API AI
+                                AI API Configuration
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
@@ -1219,7 +1219,7 @@ Rispondi SOLO con un JSON valido contenente:
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">Modello</label>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Model</label>
                                     <select
                                         value={apiConfig.model}
                                         onChange={(e) => saveApiConfig({ ...apiConfig, model: e.target.value })}
@@ -1242,9 +1242,9 @@ Rispondi SOLO con un JSON valido contenente:
                             </div>
                             <div className="mt-2 text-xs text-gray-400">
                                 {apiConfig.provider === 'openrouter' ? (
-                                    <span>Ottieni API key gratuita su <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">openrouter.ai</a></span>
+                                    <span>Get free API key at <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">openrouter.ai</a></span>
                                 ) : (
-                                    <span>Ottieni API key gratuita su <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">console.groq.com</a></span>
+                                    <span>Get free API key at <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">console.groq.com</a></span>
                                 )}
                             </div>
                         </div>
@@ -1255,7 +1255,7 @@ Rispondi SOLO con un JSON valido contenente:
                             <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
                                 <h3 className="text-xl font-semibold mb-4 flex items-center">
                                     <MicIcon className="mr-2 text-cyan-400" />
-                                    Registrazione Audio
+                                    Audio Recording
                                 </h3>
                                 
                                 <div className="mb-4">
@@ -1265,10 +1265,10 @@ Rispondi SOLO con un JSON valido contenente:
                                         microphoneStatus === 'denied' ? 'bg-red-900/30 text-red-400' :
                                         'bg-green-900/30 text-green-400'
                                     }`}>
-                                        {microphoneStatus === 'not-initialized' && '⚪ Sistema non inizializzato'}
-                                        {microphoneStatus === 'requesting' && '⏳ Richiedendo permessi...'}
-                                        {microphoneStatus === 'denied' && '❌ Permessi negati'}
-                                        {microphoneStatus === 'granted' && '✅ Microfono attivo'}
+                                        {microphoneStatus === 'not-initialized' && '⚪ System not initialized'}
+                                        {microphoneStatus === 'requesting' && '⏳ Requesting permissions...'}
+                                        {microphoneStatus === 'denied' && '❌ Permissions denied'}
+                                        {microphoneStatus === 'granted' && '✅ Microphone active'}
                                     </div>
                                 </div>
                                 
@@ -1286,7 +1286,7 @@ Rispondi SOLO con un JSON valido contenente:
                                     {microphoneStatus !== 'granted' ? (
                                         <div className="flex items-center justify-center">
                                             <MicIcon className="mr-2" />
-                                            Inizializza Microfono
+                                            Initialize Microphone
                                         </div>
                                     ) : isRecording ? (
                                         <div className="flex items-center justify-center">
@@ -1296,14 +1296,14 @@ Rispondi SOLO con un JSON valido contenente:
                                     ) : (
                                         <div className="flex items-center justify-center">
                                             <PlayIcon className="mr-2" />
-                                            Registra Pink Noise (15s)
+                                            Record Pink Noise (15s)
                                         </div>
                                     )}
                                 </button>
                                 
                                 {audioData && (
                                     <div className="mt-3 text-sm text-green-400">
-                                        ✓ {audioData.length} campioni acquisiti
+                                        ✓ {audioData.length} samples captured
                                     </div>
                                 )}
                                 
@@ -1323,7 +1323,7 @@ Rispondi SOLO con un JSON valido contenente:
                             <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
                                 <h3 className="text-xl font-semibold mb-4 flex items-center">
                                     <CameraIcon className="mr-2 text-purple-400" />
-                                    Scansione 3D
+                                    3D Scan
                                 </h3>
                                 
                                 {/* Demo Button */}
@@ -1339,17 +1339,17 @@ Rispondi SOLO con un JSON valido contenente:
                                     {isScanning3D ? (
                                         <div className="flex items-center justify-center">
                                             <SettingsIcon className="animate-spin mr-2" />
-                                            Caricando Demo...
+                                            Loading Demo...
                                         </div>
                                     ) : (
                                         <div className="flex items-center justify-center">
                                             <CameraIcon className="mr-2" />
-                                            🎬 Carica DEMO Garage
+                                            🎬 Load Garage DEMO
                                         </div>
                                     )}
                                 </button>
                                 
-                                <div className="text-center text-xs text-gray-400 mb-3">oppure</div>
+                                <div className="text-center text-xs text-gray-400 mb-3">or</div>
                                 
                                 <input
                                     type="file"
@@ -1369,7 +1369,7 @@ Rispondi SOLO con un JSON valido contenente:
                                 >
                                     <div className="flex items-center">
                                         <CameraIcon className="mr-2" />
-                                        Carica File Personale
+                                        Upload Personal File
                                     </div>
                                 </label>
                                 
@@ -1391,7 +1391,7 @@ Rispondi SOLO con un JSON valido contenente:
                             <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
                                 <h3 className="text-xl font-semibold mb-4 flex items-center">
                                     <BrainIcon className="mr-2 text-pink-400" />
-                                    Analisi AI
+                                    AI Analysis
                                 </h3>
                                 <button
                                     onClick={analyzeWithAI}
@@ -1405,25 +1405,25 @@ Rispondi SOLO con un JSON valido contenente:
                                     {isAnalyzing ? (
                                         <div className="flex items-center justify-center">
                                             <BrainIcon className="animate-pulse mr-2" />
-                                            Analizzando...
+                                            Analyzing...
                                         </div>
                                     ) : (
                                         <div className="flex items-center justify-center">
                                             <BrainIcon className="mr-2" />
-                                            Genera DSP Chain
+                                            Generate DSP Chain
                                         </div>
                                     )}
                                 </button>
                                 
                                 {!apiConfig.apiKey && (
                                     <p className="text-xs text-red-400 mt-2 text-center">
-                                        ⚠️ Configura API key
+                                        ⚠️ Configure API key
                                     </p>
                                 )}
                                 
                                 {!audioData && !spatialData && (
                                     <p className="text-xs text-yellow-400 mt-2 text-center">
-                                        📝 Registra audio e carica scansione 3D
+                                        📝 Record audio and load 3D scan
                                     </p>
                                 )}
                                 
@@ -1438,7 +1438,7 @@ Rispondi SOLO con un JSON valido contenente:
                         {/* Real-time FFT Visualization */}
                         {microphoneStatus === 'granted' && (
                             <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700">
-                                <h3 className="text-xl font-semibold mb-4">Analisi Spettrale Real-Time</h3>
+                                <h3 className="text-xl font-semibold mb-4">Real-time Spectral Analysis</h3>
                                 <div className="grid grid-cols-8 md:grid-cols-16 gap-1">
                                     {realTimeFFT.map((freq, index) => (
                                         <div key={index} className="text-center">
@@ -1474,19 +1474,19 @@ Rispondi SOLO con un JSON valido contenente:
                                 <div className="mt-4 flex items-center justify-center space-x-8 text-sm">
                                     <div className="flex items-center">
                                         <div className="w-4 h-4 bg-yellow-500 mr-2"></div>
-                                        <span className="text-gray-400">Riferimento Pink Noise</span>
+                                        <span className="text-gray-400">Pink Noise Reference</span>
                                     </div>
                                     <div className="flex items-center">
                                         <div className="w-4 h-4 bg-green-500 mr-2"></div>
-                                        <span className="text-gray-400">Risposta OK (±3dB)</span>
+                                        <span className="text-gray-400">OK Response (±3dB)</span>
                                     </div>
                                     <div className="flex items-center">
                                         <div className="w-4 h-4 bg-red-500 mr-2"></div>
-                                        <span className="text-gray-400">Eccesso</span>
+                                        <span className="text-gray-400">Excess</span>
                                     </div>
                                     <div className="flex items-center">
                                         <div className="w-4 h-4 bg-blue-500 mr-2"></div>
-                                        <span className="text-gray-400">Carenza</span>
+                                        <span className="text-gray-400">Deficiency</span>
                                     </div>
                                 </div>
                             </div>
@@ -1495,11 +1495,11 @@ Rispondi SOLO con un JSON valido contenente:
                         {/* Material Assignment */}
                         {surfaces.length > 0 && (
                             <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700">
-                                <h3 className="text-xl font-semibold mb-4">Assegnazione Materiali</h3>
+                                <h3 className="text-xl font-semibold mb-4">Material Assignment</h3>
                                 {spatialData?.isDemo && demoLoaded && (
                                     <div className="mb-4 p-3 bg-blue-900/30 border border-blue-700/30 rounded-lg">
                                         <p className="text-sm text-blue-300">
-                                            🎬 <strong>DEMO:</strong> Materiali pre-assegnati per un garage tipico. Puoi modificarli per sperimentare.
+                                            🎬 <strong>DEMO:</strong> Materials pre-assigned for a typical garage. You can modify them to experiment.
                                         </p>
                                     </div>
                                 )}
@@ -1522,7 +1522,7 @@ Rispondi SOLO con un JSON valido contenente:
                                                 }}
                                                 className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:outline-none focus:border-purple-500"
                                             >
-                                                <option value="">Seleziona materiale...</option>
+                                                <option value="">Select material...</option>
                                                 {Object.entries(MATERIALS).map(([key, mat]) => (
                                                     <option key={key} value={key}>{mat.name}</option>
                                                 ))}
@@ -1539,7 +1539,7 @@ Rispondi SOLO con un JSON valido contenente:
                                 {calculateRoomAcoustics() && (
                                     <div className="mt-4 p-4 bg-gray-700/30 rounded-lg">
                                         <p className="text-sm">
-                                            <span className="text-gray-400">RT60 medio stimato:</span>{' '}
+                                            <span className="text-gray-400">Estimated average RT60:</span>{' '}
                                             <span className="text-lg font-semibold text-cyan-400">
                                                 {calculateRoomAcoustics().avgRT60.toFixed(2)}s
                                             </span>
@@ -1553,7 +1553,7 @@ Rispondi SOLO con un JSON valido contenente:
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                             {/* 3D View */}
                             <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
-                                <h3 className="text-xl font-semibold mb-4">Visualizzazione 3D</h3>
+                                <h3 className="text-xl font-semibold mb-4">3D Visualization</h3>
                                 <div className="flex justify-center">
                                     <canvas ref={canvasRef} className="border border-gray-600 rounded-lg" />
                                 </div>
@@ -1569,26 +1569,26 @@ Rispondi SOLO con un JSON valido contenente:
                                             <div className="text-2xl font-bold text-purple-400">
                                                 {spatialData.surfaceArea.toFixed(1)}
                                             </div>
-                                            <div className="text-gray-400">m² Superficie</div>
+                                            <div className="text-gray-400">m² Surface</div>
                                         </div>
                                         <div className="text-center">
                                             <div className="text-2xl font-bold text-green-400">
                                                 {(spatialData.volume / spatialData.surfaceArea).toFixed(2)}
                                             </div>
-                                            <div className="text-gray-400">Rapporto V/S</div>
+                                            <div className="text-gray-400">V/S Ratio</div>
                                         </div>
                                     </div>
                                 )}
                                 {spatialData?.isDemo && (
                                     <div className="mt-4 text-xs text-blue-300 text-center">
-                                        🎬 Modello 3D demo: Garage vuoto con trattamenti acustici simulati
+                                        🎬 3D demo model: Empty garage with simulated acoustic treatments
                                     </div>
                                 )}
                             </div>
 
                             {/* 16-band EQ */}
                             <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
-                                <h3 className="text-xl font-semibold mb-4">Equalizzatore 16 Bande</h3>
+                                <h3 className="text-xl font-semibold mb-4">16-Band Equalizer</h3>
                                 <div className="flex items-end justify-between h-48 px-4">
                                     {EQ_FREQUENCIES.map((freq, index) => (
                                         <div key={freq} className="flex flex-col items-center">
@@ -1651,7 +1651,7 @@ Rispondi SOLO con un JSON valido contenente:
                                             }}
                                             className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition-all"
                                         >
-                                            Applica AI
+                                            Apply AI
                                         </button>
                                     )}
                                 </div>
@@ -1661,7 +1661,7 @@ Rispondi SOLO con un JSON valido contenente:
                         {/* DSP Chain Display */}
                         {dspChain.length > 0 && (
                             <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700">
-                                <h3 className="text-xl font-semibold mb-4">Catena DSP Consigliata</h3>
+                                <h3 className="text-xl font-semibold mb-4">Recommended DSP Chain</h3>
                                 <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-600">
                                     <div className="flex items-center justify-between overflow-x-auto pb-4">
                                         {dspChain.map((processor, index) => (
@@ -1727,13 +1727,13 @@ Rispondi SOLO con un JSON valido contenente:
                                     <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
                                         <div className="bg-gray-800 p-3 rounded-lg text-center">
                                             <div className="text-2xl font-bold text-cyan-400">{dspChain.length}</div>
-                                            <div className="text-xs text-gray-400">Processori</div>
+                                            <div className="text-xs text-gray-400">Processors</div>
                                         </div>
                                         <div className="bg-gray-800 p-3 rounded-lg text-center">
                                             <div className="text-2xl font-bold text-green-400">
                                                 {dspChain.filter(p => p.type === 'eq').length}
                                             </div>
-                                            <div className="text-xs text-gray-400">Bande EQ</div>
+                                            <div className="text-xs text-gray-400">EQ Bands</div>
                                         </div>
                                         <div className="bg-gray-800 p-3 rounded-lg text-center">
                                             <div className="text-2xl font-bold text-purple-400">
@@ -1755,41 +1755,41 @@ Rispondi SOLO con un JSON valido contenente:
                         {/* AI Analysis Results */}
                         {aiAnalysis && (
                             <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700">
-                                <h3 className="text-xl font-semibold mb-4">Risultati Analisi AI</h3>
+                                <h3 className="text-xl font-semibold mb-4">AI Analysis Results</h3>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                                     <div className="bg-gradient-to-r from-green-900/30 to-green-800/30 p-4 rounded-lg border border-green-700/30">
                                         <div className="text-3xl font-bold text-green-400">
                                             {aiAnalysis.score}/10
                                         </div>
-                                        <div className="text-sm text-gray-300">Score Qualità</div>
+                                        <div className="text-sm text-gray-300">Quality Score</div>
                                     </div>
                                     
                                     <div className="bg-gradient-to-r from-blue-900/30 to-blue-800/30 p-4 rounded-lg border border-blue-700/30">
                                         <div className="text-3xl font-bold text-blue-400">
                                             {calculateRoomAcoustics()?.avgRT60.toFixed(2)}s
                                         </div>
-                                        <div className="text-sm text-gray-300">RT60 Medio</div>
+                                        <div className="text-sm text-gray-300">Avg RT60</div>
                                     </div>
                                     
                                     <div className="bg-gradient-to-r from-purple-900/30 to-purple-800/30 p-4 rounded-lg border border-purple-700/30">
                                         <div className="text-3xl font-bold text-purple-400">
                                             {dspChain.length}
                                         </div>
-                                        <div className="text-sm text-gray-300">Processori DSP</div>
+                                        <div className="text-sm text-gray-300">DSP Processors</div>
                                     </div>
                                     
                                     <div className="bg-gradient-to-r from-cyan-900/30 to-cyan-800/30 p-4 rounded-lg border border-cyan-700/30">
                                         <div className="text-3xl font-bold text-cyan-400">
                                             {surfaces.filter(s => selectedMaterials[s.id]).length}
                                         </div>
-                                        <div className="text-sm text-gray-300">Superfici Trattate</div>
+                                        <div className="text-sm text-gray-300">Treated Surfaces</div>
                                     </div>
                                 </div>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <h4 className="font-semibold text-red-400 mb-2">Problemi Identificati:</h4>
+                                        <h4 className="font-semibold text-red-400 mb-2">Identified Problems:</h4>
                                         <ul className="space-y-1 text-sm">
                                             {aiAnalysis.problemi?.map((problema, index) => (
                                                 <li key={index} className="text-gray-300 flex items-start">
@@ -1800,7 +1800,7 @@ Rispondi SOLO con un JSON valido contenente:
                                         </ul>
                                     </div>
                                     <div>
-                                        <h4 className="font-semibold text-green-400 mb-2">Suggerimenti:</h4>
+                                        <h4 className="font-semibold text-green-400 mb-2">Suggestions:</h4>
                                         <ul className="space-y-1 text-sm">
                                             {aiAnalysis.suggerimenti?.map((suggerimento, index) => (
                                                 <li key={index} className="text-gray-300 flex items-start">
@@ -1826,14 +1826,14 @@ Rispondi SOLO con un JSON valido contenente:
                                 }`}
                             >
                                 <DownloadIcon className="inline mr-2" />
-                                Esporta JSON
+                                Export JSON
                             </button>
                             <button
                                 onClick={resetAnalysis}
                                 className="py-3 px-6 rounded-lg font-medium bg-gray-600 hover:bg-gray-700 transition-all active:scale-95"
                             >
                                 <RotateCcwIcon className="inline mr-2" />
-                                Reset Completo
+                                Complete Reset
                             </button>
                         </div>
 
@@ -1851,10 +1851,10 @@ Rispondi SOLO con un JSON valido contenente:
                                 </a>
                             </div>
                             <div className="space-y-1">
-                                <p>🎚️ Strumento professionale di analisi acustica con generazione di catena DSP basata su IA</p>
-                                <p>📡 Demo funzionante online • 🔧 Open Source • 🇮🇹 Made in Italy</p>
+                                <p>🎚️ Professional acoustic analysis tool with AI-powered DSP chain generation</p>
+                                <p>📡 Working online demo • 🔧 Open Source </p>
                                 <p>
-                                    Tecnologie: React • Three.js • Web Audio API • 
+                                    Technologies: React • Three.js • Web Audio API • 
                                     <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-400 hover:underline">OpenRouter</a> • 
                                     <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-400 hover:underline">Groq</a>
                                 </p>
