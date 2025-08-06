@@ -8,26 +8,6 @@ export default function ThreeDScanner({ spatialData }) {
   useEffect(() => {
     if (!canvasRef.current) return;
 
-
-
-// Aggiungi luci migliori
-const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
-scene.add(ambientLight);
-
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-directionalLight.position.set(5, 10, 5);
-directionalLight.castShadow = true;
-scene.add(directionalLight);
-
-// Aggiungi materiali semitrasparenti
-const roomMaterial = new THREE.MeshPhongMaterial({
-  color: 0x333333,
-  transparent: true,
-  opacity: 0.2,
-  wireframe: true
-});
-
-
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0a0a);
 
@@ -65,4 +45,3 @@ const roomMaterial = new THREE.MeshPhongMaterial({
     </div>
   );
 }
-

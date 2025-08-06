@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acoustic Space Analyzer AI Pro</title>
+    
+    <!-- External Dependencies -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            background: #0a0a0a;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        }
+
+        #root {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e40af 75%, #0f172a 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 20s ease infinite;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4a4a4a;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #5a5a5a;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideInUp {
+            from {
+                transform: translate3d(0, 100%, 0);
+                opacity: 0;
+            }
+            to {
+                transform: translate3d(0, 0, 0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes demoBanner {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .animate-spin { animation: spin 1s linear infinite; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        .animate-slide-up { animation: slideInUp 0.6s ease-out; }
+
+        .demo-banner {
+            background: linear-gradient(90deg, #f59e0b, #ef4444, #8b5cf6);
+            background-size: 200% 100%;
+            animation: demoBanner 3s ease infinite;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #06b6d4, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            background-size: 200% 200%;
+            animation: gradientShift 4s ease infinite;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        button {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .hover-lift:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .hover-glow:hover {
+            box-shadow: 0 0 30px rgba(236, 72, 153, 0.5);
+        }
+
+        .loading-dots::after {
+            content: '';
+            animation: loadingDots 2s infinite;
+        }
+
+        @keyframes loadingDots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect, useCallback } = React;
+
+        // Constants
+        const MATERIALS = {
+            'plasterboard': { 
+                name: 'Plasterboard', 
+                absorption: { 125: 0.29, 250: 0.10, 500: 0.05, 1000: 0.04, 2000: 0.07, 4000: 0.09 }, 
+                color: '#e0e0e0',
+                category: 'wall'
+            },
+            'concrete': { 
+                name: 'Concrete', 
+                absorption: { 125: 0.01, 250: 0.01, 500: 0.02, 1000: 0.02, 2000: 0.03, 4000: 0.03 }, 
+                color: '#808080',
+                category: 'structural'
+            },
+            'brick': { 
+                name: 'Brick', 
+                absorption: { 125: 0.03, 250: 0.03, 500: 0.03, 1000: 0.04, 2000: 0.05, 4000: 0.07 }, 
+                color: '#a52a2a',
+                category: 'wall'
+            },
+            'carpet': { 
+                name: 'Carpet', 
+                absorption: { 125: 0.08, 250: 0.24, 500: 0.57, 1000: 0.69, 2000: 0.71, 4000: 0.73 }, 
+                color: '#8b0000',
+                category: 'floor'
+            },
+            'acoustic_panel': { 
+                name: 'Acoustic Panel', 
+                absorption: { 125: 0.20, 250: 0.65, 500: 0.85, 1000: 0.95, 2000: 0.95, 4000: 0.90 }, 
+                color: '#2f4f4f',
+                category: 'treatment'
+            }
+        };
+
+        const EQ_FREQUENCIES = [20, 31.5, 63, 125, 250, 500, 1000, 2000, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000];
+
+        const PINK_NOISE_REFERENCE = {
+            20: 85, 31.5: 83, 63: 81, 125: 79, 250: 77, 500: 75,
+            1000: 73, 2000: 71, 3150: 69, 4000: 68, 5000: 67,
+            6300: 66, 8000: 65, 10000: 64, 12500: 63, 16000: 62
+        };
+
+        // Icon Components
+        const MicIcon = ({ size = 24, className = "" }) => (
+            React.createElement('svg', {
+                width: size,
+                height: size,
+                viewBox: "0 0 24 24",
+                fill: "none",
+                stroke: "currentColor",
+                strokeWidth: "2",
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+                className: className
+            },
+                React.createElement('path', { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }),
+                React.createElement('path', { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
+                React.createElement('line', { x1: "12", x2: "12", y1: "19", y2: "22" })
+            )
+        );
+
+        const CameraIcon = ({ size = 24, className = "" }) => (
+            React.createElement('svg', {
+                width: size,
+                height: size,
+                viewBox: "0 0 24 24",
+                fill: "none",
+                stroke: "currentColor",
+                strokeWidth: "2",
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+                className: className
+            },
+                React.createElement('path', { d: "M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" }),
+                React.createElement('circle', { cx: "12", cy: "13", r: "3" })
+            )
+        );
+
+        const BrainIcon = ({ size = 24, className = "" }) => (
+            React.createElement('svg', {
+                width: size,
+                height: size,
+                viewBox: "0 0 24 24",
+                fill: "none",
+                stroke: "currentColor",
+                strokeWidth: "2",
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+                className: className
+            },
+                React.createElement('path', { d: "M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" }),
+                React.createElement('path', { d: "M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" })
+            )
+        );
+
+        const PlayIcon = ({ size = 20, className = "" }) => (
+            React.createElement('svg', {
+                width: size,
+                height: size,
+                viewBox: "0 0 24 24",
+                fill: "none",
+                stroke: "currentColor",
+                strokeWidth: "2",
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+                className: className
+            },
+                React.createElement('polygon', { points: "6 3 20 12 6 21 6 3" })
+            )
+        );
+
+        const StopIcon = ({ size = 20, className = "" }) => (
+            React.createElement('svg', {
+                width: size,
+                height: size,
+                viewBox: "0 0 24 24",
+                fill: "none",
+                stroke: "currentColor",
+                strokeWidth: "2",
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+                className: className
+            },
+                React.createElement('rect', { x: "5", y: "5", width: "14", height: "14", rx: "2" })
+            )
+        );
+
+        const KeyIcon = ({ size = 20, className = "" }) => (
+            React.createElement('svg', {
+                width: size,
+                height: size,
+                viewBox: "0 0 24 24",
+                fill: "none",
+                stroke: "currentColor",
+                strokeWidth: "2",
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+                className: className
+            },
+                React.createElement('path', { d: "m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" }),
+                React.createElement('path', { d: "m21 2-9.6 9.6" }),
+                React.createElement('circle', { cx: "7.5", cy: "15.5", r: "5.5" })
+            )
+        );
+
+        const GithubIcon = ({ size = 20, className = "" }) => (
+            React.createElement('svg', {
+                width: size,
+                height: size,
+                viewBox: "0 0 24 24",
+                fill: "currentColor",
+                className: className
+            },
+                React.createElement('path', { 
+                    d: "M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" 
+                })
+            )
+        );
+
+        const LoadingSpinner = ({ size = 20, className = "" }) => (
+            React.createElement('svg', {
+                width: size,
+                height: size,
+                viewBox: "0 0 24 24",
+                fill: "none",
+                stroke: "currentColor",
+                strokeWidth: "2",
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+                className: `animate-spin ${className}`
+            },
+                React.createElement('path', { d: "M21 12A9 9 0 1 1 12 3" })
+            )
+        );
+
+        // Demo Banner Component
+        const DemoBanner = () => {
+            const [isVisible, setIsVisible] = useState(true);
+            const [timeLeft, setTimeLeft] = useState('');
+
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    setIsVisible(false);
+                }, 10000);
+
+                return () => clearTimeout(timer);
+            }, []);
+
+            useEffect(() => {
+                const updateTime = () => {
+                    const now = new Date();
+                    const hours = now.getHours().toString().padStart(2, '0');
+                    const minutes = now.getMinutes().toString().padStart(2, '0');
+                    setTimeLeft(`${hours}:${minutes}`);
+                };
+
+                updateTime();
+                const interval = setInterval(updateTime, 1000);
+                return () => clearInterval(interval);
+            }, []);
+
+            if (!isVisible) return null;
+
+            return React.createElement('div', {
+                className: "demo-banner text-center py-3 text-white font-bold text-sm relative overflow-hidden cursor-pointer",
+                onClick: () => setIsVisible(false)
+            },
+                React.createElement('div', {
+                    className: "relative z-10 flex items-center justify-center space-x-4"
+                },
+                    React.createElement('span', { className: "animate-bounce" }, '🎙️'),
+                    React.createElement('span', null, 'ONLINE DEMO'),
+                    React.createElement('span', { className: "hidden sm:inline" }, '•'),
+                    React.createElement('span', { className: "hidden sm:inline" }, 'Try Acoustic Space Analyzer AI Pro'),
+                    React.createElement('span', { className: "text-yellow-300" }, '•'),
+                    React.createElement('span', { className: "font-mono text-xs" }, timeLeft),
+                    React.createElement('button', {
+                        className: "ml-4 hover:bg-white/20 rounded p-1 transition-colors",
+                        onClick: (e) => {
+                            e.stopPropagation();
+                            setIsVisible(false);
+                        }
+                    }, '✕')
+                )
+            );
+        };
+
+        // Audio Recorder Component
+        const AudioRecorder = ({ 
+            isRecording, 
+            recordingTime, 
+            audioData, 
+            microphoneStatus, 
+            onInitialize, 
+            onStartRecording, 
+            onStopRecording 
+        }) => {
+            const getStatusConfig = () => {
+                const configs = {
+                    'not-initialized': {
+                        color: 'bg-gray-700 text-gray-300',
+                        icon: '⚪',
+                        text: 'System not initialized'
+                    },
+                    'requesting': {
+                        color: 'bg-yellow-900/30 text-yellow-400',
+                        icon: '⏳',
+                        text: 'Requesting permissions...'
+                    },
+                    'denied': {
+                        color: 'bg-red-900/30 text-red-400',
+                        icon: '❌',
+                        text: 'Permissions denied'
+                    },
+                    'granted': {
+                        color: 'bg-green-900/30 text-green-400',
+                        icon: '✅',
+                        text: 'Microphone active'
+                    }
+                };
+                return configs[microphoneStatus] || configs['not-initialized'];
+            };
+
+            const statusConfig = getStatusConfig();
+
+            return React.createElement('div', {
+                className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 animate-fade-in"
+            },
+                React.createElement('h3', {
+                    className: "text-xl font-semibold mb-4 flex items-center"
+                },
+                    React.createElement(MicIcon, { className: "mr-2 text-cyan-400" }),
+                    'Audio Recording'
+                ),
+                
+                React.createElement('div', {
+                    className: "mb-4"
+                },
+                    React.createElement('div', {
+                        className: `text-center py-2 px-3 rounded-lg transition-all ${statusConfig.color}`
+                    },
+                        `${statusConfig.icon} ${statusConfig.text}`
+                    )
+                ),
+                
+                React.createElement('button', {
+                    onClick: microphoneStatus !== 'granted' ? onInitialize : (isRecording ? onStopRecording : onStartRecording),
+                    disabled: microphoneStatus === 'requesting',
+                    className: `w-full py-3 px-4 rounded-lg font-medium transition-all ${
+                        microphoneStatus !== 'granted'
+                            ? 'bg-blue-600 hover:bg-blue-700'
+                            : isRecording
+                            ? 'bg-red-600 hover:bg-red-700'
+                            : 'bg-cyan-600 hover:bg-cyan-700'
+                    } ${microphoneStatus === 'requesting' ? 'cursor-not-allowed opacity-50' : 'hover-lift'}`
+                },
+                    React.createElement('div', {
+                        className: "flex items-center justify-center"
+                    },
+                        microphoneStatus !== 'granted' 
+                            ? [React.createElement(MicIcon, { key: 'icon', className: "mr-2" }), 'Initialize Microphone']
+                            : isRecording 
+                            ? [React.createElement(StopIcon, { key: 'icon', className: "mr-2" }), `Stop (${(15 - recordingTime).toFixed(1)}s)`]
+                            : [React.createElement(PlayIcon, { key: 'icon', className: "mr-2" }), 'Record Pink Noise (15s)']
+                    )
+                ),
+                
+                isRecording && React.createElement('div', {
+                    className: "mt-3 animate-fade-in"
+                },
+                    React.createElement('div', {
+                        className: "bg-gray-700 rounded-full h-2 overflow-hidden"
+                    },
+                        React.createElement('div', {
+                            className: "bg-gradient-to-r from-cyan-500 to-purple-500 h-full transition-all duration-100",
+                            style: { width: `${(recordingTime / 15) * 100}%` }
+                        })
+                    )
+                ),
+                
+                audioData && React.createElement('div', {
+                    className: "mt-3 text-sm text-green-400 animate-fade-in"
+                },
+                    `✓ ${audioData.length} samples captured`
+                )
+            );
+        };
+
+        // File Uploader Component
+        const FileUploader = ({ isScanning, spatialData, onLoadDemo, onFileUpload }) => {
+            return React.createElement('div', {
+                className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 animate-fade-in"
+            },
+                React.createElement('h3', {
+                    className: "text-xl font-semibold mb-4 flex items-center"
+                },
+                    React.createElement(CameraIcon, { className: "mr-2 text-purple-400" }),
+                    '3D Scan'
+                ),
+                
+                React.createElement('button', {
+                    onClick: onLoadDemo,
+                    disabled: isScanning,
+                    className: `w-full py-3 px-4 rounded-lg font-medium transition-all mb-3 ${
+                        isScanning
+                            ? 'bg-purple-600 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 hover-lift'
+                    }`
+                },
+                    React.createElement('div', {
+                        className: "flex items-center justify-center"
+                    },
+                        isScanning 
+                            ? [React.createElement(LoadingSpinner, { key: 'spinner', className: "mr-2" }), 'Loading Demo...']
+                            : [React.createElement(CameraIcon, { key: 'icon', className: "mr-2" }), '🎬 Load Garage DEMO']
+                    )
+                ),
+                
+                spatialData && React.createElement('div', {
+                    className: "mt-3 text-sm text-green-400 animate-fade-in"
+                },
+                    `✓ ${spatialData.roomDimensions.width.toFixed(1)}×${spatialData.roomDimensions.height.toFixed(1)}×${spatialData.roomDimensions.depth.toFixed(1)}m`,
+                    React.createElement('div', {
+                        className: "text-xs text-gray-400"
+                    }, spatialData.isDemo ? '🎬 DEMO' : 'Custom file')
+                )
+            );
+        };
+
+        // AI Analyzer Component
+        const AIAnalyzer = ({ isAnalyzing, audioData, spatialData, apiConfig, onAnalyze }) => {
+            const canAnalyze = audioData && spatialData && apiConfig.apiKey;
+            
+            return React.createElement('div', {
+                className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 animate-fade-in"
+            },
+                React.createElement('h3', {
+                    className: "text-xl font-semibold mb-4 flex items-center"
+                },
+                    React.createElement(BrainIcon, { className: "mr-2 text-pink-400" }),
+                    'AI Analysis'
+                ),
+                
+                React.createElement('button', {
+                    onClick: onAnalyze,
+                    disabled: isAnalyzing || !canAnalyze,
+                    className: `w-full py-3 px-4 rounded-lg font-medium transition-all ${
+                        isAnalyzing || !canAnalyze
+                            ? 'bg-gray-600 cursor-not-allowed'
+                            : 'bg-pink-600 hover:bg-pink-700 hover-lift'
+                    }`
+                },
+                    React.createElement('div', {
+                        className: "flex items-center justify-center"
+                    },
+                        isAnalyzing 
+                            ? [React.createElement(LoadingSpinner, { key: 'spinner', className: "mr-2" }), 'Analyzing...']
+                            : [React.createElement(BrainIcon, { key: 'icon', className: "mr-2" }), 'Generate DSP Chain']
+                    )
+                ),
+                
+                !apiConfig.apiKey && React.createElement('p', {
+                    className: "text-xs text-red-400 mt-2 text-center"
+                }, '⚠️ Configure API key first'),
+                
+                (!audioData || !spatialData) && React.createElement('p', {
+                    className: "text-xs text-yellow-400 mt-2 text-center"
+                }, '📝 Record audio and load 3D scan first')
+            );
+        };
+
+        // Main Application Component
+        const AcousticAnalyzerAI = () => {
+            // State Management
+            const [isRecording, setIsRecording] = useState(false);
+            const [recordingTime, setRecordingTime] = useState(0);
+            const [isScanning3D, setIsScanning3D] = useState(false);
+            const [audioData, setAudioData] = useState(null);
+            const [spatialData, setSpatialData] = useState(null);
+            const [microphoneStatus, setMicrophoneStatus] = useState('not-initialized');
+            const [apiConfig, setApiConfig] = useState({
+                provider: 'openrouter',
+                apiKey: '',
+                model: 'deepseek/deepseek-r1-distill-llama-70b'
+            });
+
+            // Refs
+            const audioContextRef = useRef(null);
+            const analyserRef = useRef(null);
+            const microphoneRef = useRef(null);
+            const recordingIntervalRef = useRef(null);
+
+            // Cleanup on unmount
+            useEffect(() => {
+                return () => {
+                    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                        audioContextRef.current.close();
+                    }
+                    if (recordingIntervalRef.current) {
+                        clearInterval(recordingIntervalRef.current);
+                    }
+                };
+            }, []);
+
+            // Initialize audio system
+            const initializeAudio = async () => {
+                try {
+                    setMicrophoneStatus('requesting');
+                    
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    audioContextRef.current = new AudioContext({
+                        sampleRate: 48000,
+                        latencyHint: 'interactive'
+                    });
+                    
+                    if (audioContextRef.current.state === 'suspended') {
+                        await audioContextRef.current.resume();
+                    }
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: { 
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                            sampleRate: 48000,
+                            channelCount: 1
+                        } 
+                    });
+                    
+                    analyserRef.current = audioContextRef.current.createAnalyser();
+                    analyserRef.current.fftSize = 16384;
+                    analyserRef.current.smoothingTimeConstant = 0.1;
+                    
+                    microphoneRef.current = audioContextRef.current.createMediaStreamSource(stream);
+                    microphoneRef.current.connect(analyserRef.current);
+                    
+                    setMicrophoneStatus('granted');
+                    console.log('Audio system initialized');
+                    
+                } catch (error) {
+                    console.error('Audio initialization error:', error);
+                    setMicrophoneStatus('denied');
+                    alert('Microphone access denied. Please allow access and try again.');
+                }
+            };
+
+            // Start recording
+            const startRecording = async () => {
+                if (microphoneStatus !== 'granted') {
+                    await initializeAudio();
+                    if (microphoneStatus !== 'granted') return;
+                }
+                
+                setIsRecording(true);
+                setRecordingTime(0);
+                setAudioData([]);
+                
+                const startTime = Date.now();
+                recordingIntervalRef.current = setInterval(() => {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    setRecordingTime(elapsed);
+                    
+                    // Simulate audio data collection
+                    const mockAnalysis = {
+                        timestamp: Date.now(),
+                        frequencyResponse: EQ_FREQUENCIES.map(freq => ({
+                            frequency: freq,
+                            dbSPL: 60 + Math.random() * 20 - 10,
+                            deviation: Math.random() * 6 - 3
+                        }))
+                    };
+                    
+                    setAudioData(prev => [...(prev || []), mockAnalysis]);
+                    
+                    if (elapsed >= 15) {
+                        stopRecording();
+                    }
+                }, 100);
+            };
+
+            // Stop recording
+            const stopRecording = () => {
+                if (recordingIntervalRef.current) {
+                    clearInterval(recordingIntervalRef.current);
+                    recordingIntervalRef.current = null;
+                }
+                setIsRecording(false);
+                console.log('Recording completed');
+            };
+
+            // Load demo file
+            const loadDemoFile = async () => {
+                setIsScanning3D(true);
+                
+                try {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    
+                    const demoData = {
+                        source: 'DEMO - Empty Old Garage Room',
+                        fileName: 'DEMO_Empty_old_Garage_room.glb',
+                        roomDimensions: {
+                            width: 6.2,
+                            height: 2.8,
+                            depth: 5.8
+                        },
+                        volume: 6.2 * 2.8 * 5.8,
+                        surfaceArea: 2 * (6.2 * 2.8 + 6.2 * 5.8 + 2.8 * 5.8),
+                        uploadedAt: new Date().toISOString(),
+                        isDemo: true
+                    };
+                    
+                    setSpatialData(demoData);
+                    console.log('Demo loaded successfully');
+                    
+                } catch (error) {
+                    console.error('Demo loading error:', error);
+                    alert('Error loading demo: ' + error.message);
+                }
+                
+                setIsScanning3D(false);
+            };
+
+            // Simple AI Analysis
+            const handleAnalyze = async () => {
+                if (!audioData || !spatialData || !apiConfig.apiKey) {
+                    alert('Please configure API key, record audio, and load 3D scan first!');
+                    return;
+                }
+                
+                alert('AI Analysis would start here. This is a simplified demo version.');
+            };
+
+            return React.createElement('div', {
+                className: "min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-white"
+            },
+                // Demo Banner
+                React.createElement(DemoBanner),
+                
+                React.createElement('div', {
+                    className: "container mx-auto p-6 max-w-7xl"
+                },
+                    // Header
+                    React.createElement('div', {
+                        className: "text-center mb-8 animate-fade-in"
+                    },
+                        React.createElement('h1', {
+                            className: "text-5xl font-bold mb-2 gradient-text"
+                        }, 'Acoustic Space Analyzer AI Pro'),
+                        React.createElement('p', {
+                            className: "text-gray-300 text-lg"
+                        }, 'Professional acoustic analysis with AI-powered DSP Chain Generator'),
+                        React.createElement('div', {
+                            className: "mt-4 flex items-center justify-center space-x-4"
+                        },
+                            React.createElement('a', {
+                                href: "https://github.com/ninuxi/acoustic-space-analyzer-ai-pro",
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                className: "flex items-center bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg transition-all hover-lift"
+                            },
+                                React.createElement(GithubIcon, { className: "mr-2" }),
+                                'View on GitHub'
+                            ),
+                            React.createElement('div', {
+                                className: "text-sm text-gray-400"
+                            }, '📡 Working online demo')
+                        )
+                    ),
+
+                    // Demo Status
+                    spatialData && spatialData.isDemo && React.createElement('div', {
+                        className: "bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30 rounded-lg p-4 mb-6 animate-fade-in"
+                    },
+                        React.createElement('div', {
+                            className: "flex items-center justify-between"
+                        },
+                            React.createElement('div', {
+                                className: "flex items-center space-x-3"
+                            },
+                                React.createElement('div', {
+                                    className: "w-3 h-3 bg-blue-400 rounded-full animate-pulse"
+                                }),
+                                React.createElement('div', null,
+                                    React.createElement('h4', {
+                                        className: "font-semibold text-blue-300"
+                                    }, '🎬 DEMO MODE ACTIVE'),
+                                    React.createElement('p', {
+                                        className: "text-sm text-gray-300"
+                                    }, 'Using sample garage room data for demonstration')
+                                )
+                            ),
+                            React.createElement('div', {
+                                className: "text-right text-sm text-gray-400"
+                            },
+                                React.createElement('div', null, 'Demo File: ', React.createElement('span', { className: "text-blue-300" }, 'DEMO_Empty_old_Garage_room.glb')),
+                                React.createElement('div', null, 
+                                    'Dimensions: ', 
+                                    React.createElement('span', { className: "font-mono text-green-300" }, 
+                                        `${spatialData.roomDimensions.width.toFixed(1)}×${spatialData.roomDimensions.height.toFixed(1)}×${spatialData.roomDimensions.depth.toFixed(1)}m`
+                                    )
+                                )
+                            )
+                        )
+                    ),
+
+                    // API Configuration Card
+                    React.createElement('div', {
+                        className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700 animate-fade-in"
+                    },
+                        React.createElement('h3', {
+                            className: "text-xl font-semibold mb-4 flex items-center"
+                        },
+                            React.createElement(KeyIcon, { className: "mr-2 text-yellow-400" }),
+                            'AI API Configuration'
+                        ),
+                        React.createElement('div', {
+                            className: "grid grid-cols-1 md:grid-cols-3 gap-4"
+                        },
+                            React.createElement('div', null,
+                                React.createElement('label', {
+                                    className: "block text-sm font-medium text-gray-400 mb-1"
+                                }, 'Provider'),
+                                React.createElement('select', {
+                                    value: apiConfig.provider,
+                                    onChange: (e) => setApiConfig({ ...apiConfig, provider: e.target.value }),
+                                    className: "w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500"
+                                },
+                                    React.createElement('option', { value: 'openrouter' }, 'OpenRouter'),
+                                    React.createElement('option', { value: 'groq' }, 'Groq')
+                                )
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('label', {
+                                    className: "block text-sm font-medium text-gray-400 mb-1"
+                                }, 'API Key'),
+                                React.createElement('input', {
+                                    type: 'password',
+                                    value: apiConfig.apiKey,
+                                    onChange: (e) => setApiConfig({ ...apiConfig, apiKey: e.target.value }),
+                                    placeholder: "sk-or-v1-...",
+                                    className: "w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500"
+                                })
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('label', {
+                                    className: "block text-sm font-medium text-gray-400 mb-1"
+                                }, 'Model'),
+                                React.createElement('select', {
+                                    value: apiConfig.model,
+                                    onChange: (e) => setApiConfig({ ...apiConfig, model: e.target.value }),
+                                    className: "w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500"
+                                },
+                                    apiConfig.provider === 'openrouter' ? [
+                                        React.createElement('option', { key: '1', value: 'deepseek/deepseek-r1-distill-llama-70b' }, 'DeepSeek R1 70B'),
+                                        React.createElement('option', { key: '2', value: 'meta-llama/llama-3.1-70b-instruct' }, 'Llama 3.1 70B'),
+                                        React.createElement('option', { key: '3', value: 'google/gemini-flash-1.5' }, 'Gemini Flash 1.5')
+                                    ] : [
+                                        React.createElement('option', { key: '1', value: 'llama-3.3-70b-versatile' }, 'Llama 3.3 70B'),
+                                        React.createElement('option', { key: '2', value: 'mixtral-8x7b-32768' }, 'Mixtral 8x7B')
+                                    ]
+                                )
+                            )
+                        ),
+                        React.createElement('div', {
+                            className: "mt-2 text-xs text-gray-400"
+                        },
+                            apiConfig.provider === 'openrouter' 
+                                ? React.createElement('span', null, 'Get free API key at ', React.createElement('a', { href: "https://openrouter.ai", target: "_blank", rel: "noopener noreferrer", className: "text-blue-400 hover:underline" }, 'openrouter.ai'))
+                                : React.createElement('span', null, 'Get free API key at ', React.createElement('a', { href: "https://console.groq.com", target: "_blank", rel: "noopener noreferrer", className: "text-blue-400 hover:underline" }, 'console.groq.com'))
+                        )
+                    ),
+
+                    // Main Controls
+                    React.createElement('div', {
+                        className: "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
+                    },
+                        // Audio Recorder
+                        React.createElement(AudioRecorder, {
+                            isRecording: isRecording,
+                            recordingTime: recordingTime,
+                            audioData: audioData,
+                            microphoneStatus: microphoneStatus,
+                            onInitialize: initializeAudio,
+                            onStartRecording: startRecording,
+                            onStopRecording: stopRecording
+                        }),
+
+                        // File Uploader
+                        React.createElement(FileUploader, {
+                            isScanning: isScanning3D,
+                            spatialData: spatialData,
+                            onLoadDemo: loadDemoFile,
+                            onFileUpload: () => console.log('File upload not implemented in demo')
+                        }),
+
+                        // AI Analyzer
+                        React.createElement(AIAnalyzer, {
+                            isAnalyzing: false,
+                            audioData: audioData,
+                            spatialData: spatialData,
+                            apiConfig: apiConfig,
+                            onAnalyze: handleAnalyze
+                        })
+                    ),
+
+                    // Demo Features Showcase
+                    React.createElement('div', {
+                        className: "bg-gray-800/30 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700/50 animate-fade-in"
+                    },
+                        React.createElement('h3', {
+                            className: "text-xl font-semibold mb-4 text-center gradient-text"
+                        }, '✨ Demo Features'),
+                        
+                        React.createElement('div', {
+                            className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                        },
+                            [
+                                { icon: '🎤', title: 'Real-time Audio Analysis', desc: 'Live FFT visualization with pink noise reference' },
+                                { icon: '🏠', title: '3D Room Modeling', desc: 'Load demo garage or upload your own 3D scan' },
+                                { icon: '🧠', title: 'AI-Powered DSP Chain', desc: 'Smart acoustic correction recommendations' },
+                                { icon: '🎛️', title: '16-Band Equalizer', desc: 'Professional frequency response correction' },
+                                { icon: '📊', title: 'Material Assignment', desc: 'Acoustic properties database with visualization' },
+                                { icon: '📁', title: 'Export Results', desc: 'Save analysis data and DSP settings as JSON' }
+                            ].map((feature, index) => 
+                                React.createElement('div', {
+                                    key: index,
+                                    className: "bg-gray-700/30 p-4 rounded-lg hover:bg-gray-700/50 transition-all duration-300 hover-lift",
+                                    style: { animationDelay: `${index * 0.1}s` }
+                                },
+                                    React.createElement('div', {
+                                        className: "text-2xl mb-2"
+                                    }, feature.icon),
+                                    React.createElement('h4', {
+                                        className: "font-semibold text-white mb-1"
+                                    }, feature.title),
+                                    React.createElement('p', {
+                                        className: "text-sm text-gray-300"
+                                    }, feature.desc)
+                                )
+                            )
+                        )
+                    ),
+
+                    // Status Summary
+                    React.createElement('div', {
+                        className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700 animate-fade-in"
+                    },
+                        React.createElement('h3', {
+                            className: "text-xl font-semibold mb-4"
+                        }, '📊 Current Status'),
+                        React.createElement('div', {
+                            className: "grid grid-cols-2 md:grid-cols-4 gap-4"
+                        },
+                            React.createElement('div', {
+                                className: "text-center p-4 bg-gray-700/30 rounded-lg"
+                            },
+                                React.createElement('div', {
+                                    className: `text-2xl font-bold ${microphoneStatus === 'granted' ? 'text-green-400' : 'text-gray-400'}`
+                                }, microphoneStatus === 'granted' ? '✅' : '⚪'),
+                                React.createElement('div', {
+                                    className: "text-sm text-gray-400 mt-1"
+                                }, 'Microphone')
+                            ),
+                            React.createElement('div', {
+                                className: "text-center p-4 bg-gray-700/30 rounded-lg"
+                            },
+                                React.createElement('div', {
+                                    className: `text-2xl font-bold ${audioData ? 'text-green-400' : 'text-gray-400'}`
+                                }, audioData ? '🎤' : '⚪'),
+                                React.createElement('div', {
+                                    className: "text-sm text-gray-400 mt-1"
+                                }, 'Audio Data')
+                            ),
+                            React.createElement('div', {
+                                className: "text-center p-4 bg-gray-700/30 rounded-lg"
+                            },
+                                React.createElement('div', {
+                                    className: `text-2xl font-bold ${spatialData ? 'text-green-400' : 'text-gray-400'}`
+                                }, spatialData ? '🏠' : '⚪'),
+                                React.createElement('div', {
+                                    className: "text-sm text-gray-400 mt-1"
+                                }, '3D Data')
+                            ),
+                            React.createElement('div', {
+                                className: "text-center p-4 bg-gray-700/30 rounded-lg"
+                            },
+                                React.createElement('div', {
+                                    className: `text-2xl font-bold ${apiConfig.apiKey ? 'text-green-400' : 'text-gray-400'}`
+                                }, apiConfig.apiKey ? '🔑' : '⚪'),
+                                React.createElement('div', {
+                                    className: "text-sm text-gray-400 mt-1"
+                                }, 'API Key')
+                            )
+                        )
+                    ),
+
+                    // Instructions
+                    React.createElement('div', {
+                        className: "bg-blue-900/20 border border-blue-700/30 rounded-xl p-6 mb-8 animate-fade-in"
+                    },
+                        React.createElement('h3', {
+                            className: "text-xl font-semibold mb-4 text-blue-300"
+                        }, '🚀 Quick Start Guide'),
+                        React.createElement('ol', {
+                            className: "space-y-2 text-gray-300"
+                        },
+                            React.createElement('li', { className: "flex items-start" },
+                                React.createElement('span', { className: "bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-3 mt-0.5 flex-shrink-0" }, '1'),
+                                React.createElement('span', null, 'Configure your AI API key (OpenRouter or Groq) above')
+                            ),
+                            React.createElement('li', { className: "flex items-start" },
+                                React.createElement('span', { className: "bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-3 mt-0.5 flex-shrink-0" }, '2'),
+                                React.createElement('span', null, 'Load the demo garage room or upload your own 3D scan')
+                            ),
+                            React.createElement('li', { className: "flex items-start" },
+                                React.createElement('span', { className: "bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-3 mt-0.5 flex-shrink-0" }, '3'),
+                                React.createElement('span', null, 'Initialize microphone and record 15 seconds of pink noise')
+                            ),
+                            React.createElement('li', { className: "flex items-start" },
+                                React.createElement('span', { className: "bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-3 mt-0.5 flex-shrink-0" }, '4'),
+                                React.createElement('span', null, 'Click "Generate DSP Chain" to get AI-powered acoustic analysis')
+                            )
+                        )
+                    ),
+
+                    // Footer
+                    React.createElement('div', {
+                        className: "mt-12 text-center text-gray-400 text-sm animate-fade-in"
+                    },
+                        React.createElement('div', {
+                            className: "mb-4"
+                        },
+                            React.createElement('a', {
+                                href: "https://github.com/ninuxi/acoustic-space-analyzer-ai-pro",
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                className: "inline-flex items-center hover:text-white transition-colors"
+                            },
+                                React.createElement(GithubIcon, { className: "mr-2" }),
+                                'Acoustic Space Analyzer AI Pro'
+                            )
+                        ),
+                        React.createElement('div', {
+                            className: "space-y-1"
+                        },
+                            React.createElement('p', null, '🎚️ Professional acoustic analysis tool with AI-powered DSP chain generation'),
+                            React.createElement('p', null, '📡 Working online demo • 🔧 Open Source'),
+                            React.createElement('p', null,
+                                'Technologies: React • Three.js • Web Audio API • ',
+                                React.createElement('a', {
+                                    href: "https://openrouter.ai",
+                                    target: "_blank",
+                                    rel: "noopener noreferrer",
+                                    className: "ml-1 text-blue-400 hover:underline"
+                                }, 'OpenRouter'),
+                                ' • ',
+                                React.createElement('a', {
+                                    href: "https://console.groq.com",
+                                    target: "_blank", 
+                                    rel: "noopener noreferrer",
+                                    className: "ml-1 text-blue-400 hover:underline"
+                                }, 'Groq')
+                            )
+                        )
+                    )
+                )
+            );
+        };
+
+        // Render the application
+        ReactDOM.render(React.createElement(AcousticAnalyzerAI), document.getElementById('root'));
+    </script>
+</body>
+</html>

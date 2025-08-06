@@ -1,0 +1,1735 @@
+const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+                    const renderer = new THREE.WebGLRenderer({ 
+                        canvas: canvasRef.current, 
+                        antialias: true,
+                        alpha: true
+                    });
+                    renderer.setSize(400, 300);
+                    renderer.setPixelRatio(window.devicePixelRatio);
+                    renderer.shadowMap.enabled = true;
+                    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                    
+                    // Enhanced lighting setup
+                    const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+                    scene.add(ambientLight);
+                    
+                    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                    directionalLight.position.set(5, 10, 5);
+                    directionalLight.castShadow = true;
+                    scene.add(directionalLight);
+                    
+                    // Grid helper
+                    const gridHelper = new THREE.GridHelper(20, 20, 0x333333, 0x333333);
+                    scene.add(gridHelper);
+                    
+                    camera.position.set(8, 6, 8);
+                    camera.lookAt(0, 0, 0);
+                    
+                    sceneRef.current = scene;
+                    rendererRef.current = renderer;
+                    cameraRef.current = camera;
+                    
+                    // Animation loop
+                    const animate = () => {
+                        if (sceneRef.current && rendererRef.current && cameraRef.current) {
+                            const time = Date.now() * 0.0003;
+                            cameraRef.current.position.x = Math.cos(time) * 12;
+                            cameraRef.current.position.z = Math.sin(time) * 12;
+                            cameraRef.current.position.y = 6 + Math.sin(time * 0.5) * 2;
+                            cameraRef.current.lookAt(0, 0, 0);
+                            
+                            rendererRef.current.render(sceneRef.current, cameraRef.current);
+                        }
+                        requestAnimationFrame(animate);
+                    };
+                    animate();
+                    
+                } catch (error) {
+                    console.error('3D visualization initialization error:', error);
+                }
+            };
+
+            // Load demo file
+            const loadDemoFile = async () => {
+                setIsScanning3D(true);
+                setDemoLoaded(false);
+                
+                try {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    
+                    const demoData = {
+                        source: 'DEMO - Empty Old Garage Room',
+                        fileName: 'DEMO_Empty_old_Garage_room.glb',
+                        roomDimensions: { width: 6.2, height: 2.8, depth: 5.8 },
+                        volume: 6.2 * 2.8 * 5.8,
+                        surfaceArea: 2 * (6.2 * 2.8 + 6.2 * 5.8 + 2.8 * 5.8),
+                        uploadedAt: new Date().toISOString(),
+                        isDemo: true,
+                        treatments: [
+                            { x: -2, y: 0, z: -2, type: 'absorption', material: 'acoustic_panel' },
+                            { x: 2, y: 0, z: -2, type: 'absorption', material: 'foam_panel' },
+                            { x: 0, y: 1, z: 2, type: 'diffusion', material: 'rockwool_panel' }
+                        ]
+                    };
+                    
+                    setSpatialData(demoData);
+                    generateSurfaces(demoData.roomDimensions);
+                    visualize3DData(demoData);
+                    
+                    const demoMaterials = {
+                        'floor': 'concrete',
+                        'ceiling': 'plasterboard',
+                        'wall_front': 'concrete',
+                        'wall_back': 'concrete', 
+                        'wall_left': 'brick',
+                        'wall_right': 'brick'
+                    };
+                    setSelectedMaterials(demoMaterials);
+                    setDemoLoaded(true);
+                    
+                } catch (error) {
+                    console.error('Demo loading error:', error);
+                    alert('Error loading demo: ' + error.message);
+                }
+                
+                setIsScanning3D(false);
+            };
+
+            // Generate surfaces from room dimensions
+            const generateSurfaces = (dimensions) => {
+                const { width, height, depth } = dimensions;
+                const newSurfaces = [
+                    { id: 'floor', name: 'Floor', area: width * depth, normal: [0, 1, 0] },
+                    { id: 'ceiling', name: 'Ceiling', area: width * depth, normal: [0, -1, 0] },
+                    { id: 'wall_front', name: 'Front Wall', area: width * height, normal: [0, 0, -1] },
+                    { id: 'wall_back', name: 'Back Wall', area: width * height, normal: [0, 0, 1] },
+                    { id: 'wall_left', name: 'Left Wall', area: depth * height, normal: [1, 0, 0] },
+                    { id: 'wall_right', name: 'Right Wall', area: depth * height, normal: [-1, 0, 0] }
+                ];
+                setSurfaces(newSurfaces);
+            };
+
+            // Visualize 3D data
+            const visualize3DData = (data) => {
+                if (!sceneRef.current) return;
+                
+                const toRemove = [];
+                sceneRef.current.traverse((child) => {
+                    if (child.userData.isRoom) toRemove.push(child);
+                });
+                toRemove.forEach(child => sceneRef.current.remove(child));
+                
+                const { roomDimensions } = data;
+                
+                // Create room wireframe
+                const roomGeometry = new THREE.BoxGeometry(roomDimensions.width, roomDimensions.height, roomDimensions.depth);
+                const roomMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x444444,
+                    wireframe: true,
+                    opacity: 0.3,
+                    transparent: true
+                });
+                const room = new THREE.Mesh(roomGeometry, roomMaterial);
+                room.userData.isRoom = true;
+                sceneRef.current.add(room);
+                
+                // Add acoustic treatments
+                if (data.treatments) {
+                    data.treatments.forEach(treatment => {
+                        const geometry = new THREE.SphereGeometry(0.3);
+                        const material = new THREE.MeshPhongMaterial({
+                            color: treatment.type === 'absorption' ? 0x00ff00 : 0xff6600,
+                            emissive: treatment.type === 'absorption' ? 0x004400 : 0x331100,
+                            emissiveIntensity: 0.2
+                        });
+                        const sphere = new THREE.Mesh(geometry, material);
+                        sphere.position.set(treatment.x, treatment.y, treatment.z);
+                        sphere.userData.isRoom = true;
+                        sceneRef.current.add(sphere);
+                    });
+                }
+            };
+
+            // AI Analysis with complete DSP chain generation
+            const analyzeWithAI = async () => {
+                if (!audioData || !spatialData) {
+                    alert('Please record audio and scan 3D space first!');
+                    return;
+                }
+                
+                if (!apiConfig.apiKey) {
+                    alert('Please configure API key first!');
+                    return;
+                }
+                
+                setIsAnalyzing(true);
+                
+                try {
+                    // Calculate room acoustics
+                    const acoustics = calculateRoomAcoustics();
+                    
+                    // Prepare audio analysis
+                    const avgFrequencyResponse = {};
+                    EQ_FREQUENCIES.forEach(freq => {
+                        const values = audioData.map(d => 
+                            d.frequencyResponse.find(f => f.frequency === freq)?.dbSPL || 0
+                        );
+                        avgFrequencyResponse[freq] = values.reduce((a, b) => a + b, 0) / values.length;
+                    });
+                    
+                    // Prepare comprehensive prompt
+                    const prompt = `You are an expert audio engineer specializing in DSP and SOFTWARE acoustic correction. Analyze this data and provide an optimal DSP processing chain.
+
+IMPORTANT: The user can ONLY use software/DSP solutions. DO NOT suggest physical treatments like panels, bass traps, carpets, etc.
+
+AUDIO DATA (Pink Noise Response):
+${JSON.stringify(avgFrequencyResponse, null, 2)}
+
+SPATIAL DATA:
+- Volume: ${spatialData.volume.toFixed(1)}m³
+- Dimensions: ${spatialData.roomDimensions.width.toFixed(1)}×${spatialData.roomDimensions.height.toFixed(1)}×${spatialData.roomDimensions.depth.toFixed(1)}m
+- RT60 per band: ${acoustics ? JSON.stringify(acoustics.rt60, null, 2) : 'Not calculated'}
+
+SURFACE MATERIALS:
+${surfaces.map(s => `${s.name}: ${MATERIALS[selectedMaterials[s.id]]?.name || 'Not assigned'}`).join('\n')}
+
+Respond ONLY with a valid JSON containing:
+{
+  "dspChain": [
+    {
+      "type": "eq|compressor|limiter|gate|reverb|delay|hpf|lpf",
+      "params": {
+        "frequency": 100,
+        "gain": -3.5,
+        "q": 1.2
+      },
+      "description": "brief technical description"
+    }
+  ],
+  "eqCurve": {
+    "20": 0, "31.5": 0, "63": 0, "125": 0, "250": 0, "500": 0, 
+    "1000": 0, "2000": 0, "3150": 0, "4000": 0, "5000": 0, 
+    "6300": 0, "8000": 0, "10000": 0, "12500": 0, "16000": 0
+  },
+  "problems": ["list of identified acoustic issues"],
+  "score": 7.5,
+  "suggestions": ["ONLY software suggestions: VST plugins, DSP techniques, room correction software, etc"]
+}`;
+
+                    // Make API call
+                    const response = await callAI(prompt);
+                    
+                    if (response) {
+                        setAiAnalysis(response);
+                        if (response.dspChain) setDspChain(response.dspChain);
+                        if (response.eqCurve) setEqSettings(response.eqCurve);
+                    }
+                    
+                } catch (error) {
+                    console.error('AI analysis error:', error);
+                    performLocalAnalysis();
+                }
+                
+                setIsAnalyzing(false);
+            };
+
+            // Calculate room acoustics
+            const calculateRoomAcoustics = () => {
+                if (!spatialData || !surfaces.length) return null;
+                const { volume, surfaceArea } = spatialData;
+                const frequencyBands = [125, 250, 500, 1000, 2000, 4000];
+                
+                const absorption = frequencyBands.reduce((acc, freq) => {
+                    let totalAbsorption = 0;
+                    surfaces.forEach(surface => {
+                        const materialKey = selectedMaterials[surface.id];
+                        if (materialKey && MATERIALS[materialKey]) {
+                            const material = MATERIALS[materialKey];
+                            totalAbsorption += surface.area * (material.absorption[freq] || 0.05);
+                        }
+                    });
+                    acc[freq] = totalAbsorption;
+                    return acc;
+                }, {});
+                
+                const rt60 = frequencyBands.reduce((acc, freq) => {
+                    const A = absorption[freq];
+                    acc[freq] = A > 0 ? (0.161 * volume) / A : 10;
+                    return acc;
+                }, {});
+                
+                const avgRT60 = Object.values(rt60).reduce((a, b) => a + b, 0) / frequencyBands.length;
+                return { absorption, rt60, avgRT60, volume, surfaceArea };
+            };
+
+            // Call AI API
+            const callAI = async (prompt) => {
+                const { provider, apiKey, model } = apiConfig;
+                
+                try {
+                    let response;
+                    
+                    if (provider === 'openrouter') {
+                        response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${apiKey}`,
+                                'Content-Type': 'application/json',
+                                'HTTP-Referer': window.location.href,
+                                'X-Title': 'Acoustic Analyzer AI'
+                            },
+                            body: JSON.stringify({
+                                model: model,
+                                messages: [{ role: 'user', content: prompt }],
+                                temperature: 0.3,
+                                max_tokens: 2000
+                            })
+                        });
+                    } else if (provider === 'groq') {
+                        response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${apiKey}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                model: 'llama-3.3-70b-versatile',
+                                messages: [{ role: 'user', content: prompt }],
+                                temperature: 0.3,
+                                max_tokens: 2000
+                            })
+                        });
+                    }
+                    
+                    if (!response.ok) {
+                        throw new Error(`API error: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    const content = data.choices[0].message.content;
+                    
+                    // Parse JSON from response
+                    const jsonMatch = content.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        return JSON.parse(jsonMatch[0]);
+                    }
+                    
+                    throw new Error('Invalid JSON response');
+                    
+                } catch (error) {
+                    console.error('AI API error:', error);
+                    throw error;
+                }
+            };
+
+            // Perform local analysis (fallback)
+            const performLocalAnalysis = () => {
+                const acoustics = calculateRoomAcoustics();
+                const avgRT60 = acoustics?.avgRT60 || 0.5;
+                
+                // Generate EQ curve based on deviations
+                const eqCurve = {};
+                EQ_FREQUENCIES.forEach(freq => {
+                    const deviation = deviationData[EQ_FREQUENCIES.indexOf(freq)] || 0;
+                    eqCurve[freq] = Math.round(-deviation * 0.7 * 10) / 10;
+                });
+                
+                // Generate comprehensive DSP chain
+                const dspChain = [
+                    {
+                        type: 'hpf',
+                        params: { frequency: 25, q: 0.5 },
+                        description: 'Remove subsonic rumble'
+                    },
+                    {
+                        type: 'eq',
+                        params: { frequency: 63, gain: eqCurve[63] || -2.5, q: 1.8 },
+                        description: 'Deep bass resonance control'
+                    },
+                    {
+                        type: 'eq',
+                        params: { frequency: 125, gain: eqCurve[125] || -3, q: 2 },
+                        description: 'Main modal resonance correction'
+                    },
+                    {
+                        type: 'eq',
+                        params: { frequency: 250, gain: eqCurve[250] || -2, q: 1.5 },
+                        description: 'Low-mid balance adjustment'
+                    },
+                    {
+                        type: 'compressor',
+                        params: { threshold: -12, ratio: 3, attack: 10, release: 100, knee: 2 },
+                        description: 'Overall dynamics control'
+                    }
+                ];
+                
+                if (avgRT60 > 0.6) {
+                    dspChain.push({
+                        type: 'reverb',
+                        params: { roomSize: 0.3, damping: 0.8, wetLevel: -20, dryLevel: 0 },
+                        description: 'Compensation for excessive reverb'
+                    });
+                }
+
+                dspChain.push({
+                    type: 'limiter',
+                    params: { threshold: -3, release: 10, lookahead: 2 },
+                    description: 'Peak level protection'
+                });
+                
+                const analysis = {
+                    dspChain,
+                    eqCurve,
+                    problems: [
+                        avgRT60 > 0.6 ? 'Excessive reverb time' : 'Reverb within normal range',
+                        'Possible modal resonances at low frequencies',
+                        'Primary reflections not compensated via DSP'
+                    ],
+                    score: Math.max(1, Math.min(10, 10 - avgRT60 * 3)),
+                    suggestions: [
+                        'Use dynamic multiband EQ for adaptive resonance control',
+                        'Apply de-esser at 4-8kHz frequencies if excessive sibilance',
+                        'Configure digital crossover for optimal sub management',
+                        avgRT60 > 0.7 ? 'Use de-reverb plugins like SPL De-Verb or Zynaptiq UNVEIL' : 'Balance linear and dynamic EQ',
+                        'Implement room correction software (Sonarworks, IK ARC, Dirac Live)',
+                        'Use multiband compressor for zone-based spectrum control',
+                        'Apply slight stereo widening above 300Hz for greater spatiality'
+                    ]
+                };
+                
+                setAiAnalysis(analysis);
+                setDspChain(analysis.dspChain);
+                setEqSettings(eqCurve);
+            };
+
+            // Reset all analysis
+            const resetAnalysis = () => {
+                setAudioData(null);
+                setSpatialData(null);
+                setAiAnalysis(null);
+                setDspChain([]);
+                setEqSettings(EQ_FREQUENCIES.reduce((acc, freq) => ({ ...acc, [freq]: 0 }), {}));
+                setMicrophoneStatus('not-initialized');
+                setUploadedFile(null);
+                setRealTimeFFT([]);
+                setDeviationData([]);
+                setSelectedMaterials({});
+                setSurfaces([]);
+                setRecordingTime(0);
+                setDemoLoaded(false);
+                
+                if (sceneRef.current) {
+                    const toRemove = [];
+                    sceneRef.current.traverse((child) => {
+                        if (child.userData.isRoom) toRemove.push(child);
+                    });
+                    toRemove.forEach(child => sceneRef.current.remove(child));
+                }
+            };
+
+            return React.createElement('div', {
+                className: "min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-white"
+            },
+                // Demo Banner
+                React.createElement(DemoBanner),
+                
+                React.createElement('div', { className: "container mx-auto p-6 max-w-7xl" },
+                    // Header
+                    React.createElement('div', { className: "text-center mb-8 animate-fade-in" },
+                        React.createElement('h1', { className: "text-5xl font-bold mb-2 gradient-text" }, 'Acoustic Space Analyzer AI Pro'),
+                        React.createElement('p', { className: "text-gray-300 text-lg" }, 'Professional acoustic analysis with AI-powered DSP Chain Generator'),
+                        React.createElement('div', { className: "mt-4 flex items-center justify-center space-x-4" },
+                            React.createElement('a', {
+                                href: "https://github.com/ninuxi/acoustic-space-analyzer-ai-pro",
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                className: "flex items-center bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg transition-all hover-lift"
+                            },
+                                React.createElement(GithubIcon, { className: "mr-2" }),
+                                'View on GitHub'
+                            ),
+                            React.createElement('div', { className: "text-sm text-gray-400" }, '📡 Working online demo')
+                        )
+                    ),
+
+                    // Demo Status
+                    spatialData?.isDemo && React.createElement('div', {
+                        className: "bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30 rounded-lg p-4 mb-6 animate-fade-in"
+                    },
+                        React.createElement('div', { className: "flex items-center justify-between" },
+                            React.createElement('div', { className: "flex items-center space-x-3" },
+                                React.createElement('div', { className: "w-3 h-3 bg-blue-400 rounded-full animate-pulse" }),
+                                React.createElement('div', null,
+                                    React.createElement('h4', { className: "font-semibold text-blue-300" }, '🎬 DEMO MODE ACTIVE'),
+                                    React.createElement('p', { className: "text-sm text-gray-300" }, 'Using sample garage room data for demonstration')
+                                )
+                            ),
+                            React.createElement('div', { className: "text-right text-sm text-gray-400" },
+                                React.createElement('div', null, 'Demo File: ', React.createElement('span', { className: "text-blue-300" }, 'DEMO_Empty_old_Garage_room.glb')),
+                                React.createElement('div', null, 
+                                    'Dimensions: ', 
+                                    React.createElement('span', { className: "font-mono text-green-300" }, 
+                                        `${spatialData.roomDimensions?.width?.toFixed(1)}×${spatialData.roomDimensions?.height?.toFixed(1)}×${spatialData.roomDimensions?.depth?.toFixed(1)}m`
+                                    )
+                                )
+                            )
+                        )
+                    ),
+
+                    // API Configuration
+                    React.createElement('div', { className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700 animate-fade-in" },
+                        React.createElement('h3', { className: "text-xl font-semibold mb-4 flex items-center" },
+                            React.createElement(KeyIcon, { className: "mr-2 text-yellow-400" }),
+                            'AI API Configuration'
+                        ),
+                        React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-4" },
+                            React.createElement('div', null,
+                                React.createElement('label', { className: "block text-sm font-medium text-gray-400 mb-1" }, 'Provider'),
+                                React.createElement('select', {
+                                    value: apiConfig.provider,
+                                    onChange: (e) => saveApiConfig({ ...apiConfig, provider: e.target.value }),
+                                    className: "w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500"
+                                },
+                                    React.createElement('option', { value: 'openrouter' }, 'OpenRouter'),
+                                    React.createElement('option', { value: 'groq' }, 'Groq')
+                                )
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('label', { className: "block text-sm font-medium text-gray-400 mb-1" }, 'API Key'),
+                                React.createElement('input', {
+                                    type: 'password',
+                                    value: apiConfig.apiKey,
+                                    onChange: (e) => saveApiConfig({ ...apiConfig, apiKey: e.target.value }),
+                                    placeholder: "sk-or-v1-...",
+                                    className: "w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500"
+                                })
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('label', { className: "block text-sm font-medium text-gray-400 mb-1" }, 'Model'),
+                                React.createElement('select', {
+                                    value: apiConfig.model,
+                                    onChange: (e) => saveApiConfig({ ...apiConfig, model: e.target.value }),
+                                    className: "w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500"
+                                },
+                                    apiConfig.provider === 'openrouter' ? [
+                                        React.createElement('option', { key: '1', value: 'deepseek/deepseek-r1-distill-llama-70b' }, 'DeepSeek R1 70B'),
+                                        React.createElement('option', { key: '2', value: 'meta-llama/llama-3.1-70b-instruct' }, 'Llama 3.1 70B'),
+                                        React.createElement('option', { key: '3', value: 'google/gemini-flash-1.5' }, 'Gemini Flash 1.5')
+                                    ] : [
+                                        React.createElement('option', { key: '1', value: 'llama-3.3-70b-versatile' }, 'Llama 3.3 70B'),
+                                        React.createElement('option', { key: '2', value: 'mixtral-8x7b-32768' }, 'Mixtral 8x7B')
+                                    ]
+                                )
+                            )
+                        ),
+                        React.createElement('div', { className: "mt-2 text-xs text-gray-400" },
+                            apiConfig.provider === 'openrouter' 
+                                ? React.createElement('span', null, 'Get free API key at ', React.createElement('a', { href: "https://openrouter.ai", target: "_blank", rel: "noopener noreferrer", className: "text-blue-400 hover:underline" }, 'openrouter.ai'))
+                                : React.createElement('span', null, 'Get free API key at ', React.createElement('a', { href: "https://console.groq.com", target: "_blank", rel: "noopener noreferrer", className: "text-blue-400 hover:underline" }, 'console.groq.com'))
+                        )
+                    ),
+
+                    // Main Controls Grid
+                    React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" },
+                        // Audio Recorder
+                        React.createElement('div', { className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 animate-fade-in" },
+                            React.createElement('h3', { className: "text-xl font-semibold mb-4 flex items-center" },
+                                React.createElement(MicIcon, { className: "mr-2 text-cyan-400" }),
+                                'Audio Recording'
+                            ),
+                            React.createElement('div', { className: "mb-4" },
+                                React.createElement('div', {
+                                    className: `text-center py-2 px-3 rounded-lg transition-all ${
+                                        microphoneStatus === 'not-initialized' ? 'bg-gray-700 text-gray-300' :
+                                        microphoneStatus === 'requesting' ? 'bg-yellow-900/30 text-yellow-400' :
+                                        microphoneStatus === 'denied' ? 'bg-red-900/30 text-red-400' :
+                                        'bg-green-900/30 text-green-400'
+                                    }`
+                                },
+                                    microphoneStatus === 'not-initialized' && '⚪ System not initialized',
+                                    microphoneStatus === 'requesting' && '⏳ Requesting permissions...',
+                                    microphoneStatus === 'denied' && '❌ Permissions denied',
+                                    microphoneStatus === 'granted' && '✅ Microphone active'
+                                )
+                            ),
+                            React.createElement('button', {
+                                onClick: microphoneStatus !== 'granted' ? initializeAudio : (isRecording ? stopRecording : startRecording),
+                                disabled: microphoneStatus === 'requesting',
+                                className: `w-full py-3 px-4 rounded-lg font-medium transition-all ${
+                                    microphoneStatus !== 'granted' ? 'bg-blue-600 hover:bg-blue-700' :
+                                    isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-cyan-600 hover:bg-cyan-700'
+                                } ${microphoneStatus === 'requesting' ? 'cursor-not-allowed opacity-50' : 'hover-lift'}`
+                            },
+                                React.createElement('div', { className: "flex items-center justify-center" },
+                                    microphoneStatus !== 'granted' 
+                                        ? [React.createElement(MicIcon, { key: 'icon', className: "mr-2" }), 'Initialize Microphone']
+                                        : isRecording 
+                                        ? [React.createElement(StopIcon, { key: 'icon', className: "mr-2" }), `Stop (${(15 - recordingTime).toFixed(1)}s)`]
+                                        : [React.createElement(PlayIcon, { key: 'icon', className: "mr-2" }), 'Record Pink Noise (15s)']
+                                )
+                            ),
+                            isRecording && React.createElement('div', { className: "mt-3 animate-fade-in" },
+                                React.createElement('div', { className: "progress-bar rounded-full h-2 overflow-hidden" },
+                                    React.createElement('div', {
+                                        className: "progress-fill h-full transition-all duration-100",
+                                        style: { width: `${(recordingTime / 15) * 100}%` }
+                                    })
+                                )
+                            ),
+                            audioData && React.createElement('div', { className: "mt-3 text-sm text-green-400 animate-fade-in" },
+                                `✓ ${audioData.length} samples captured`
+                            )
+                        ),
+
+                        // File Uploader
+                        React.createElement('div', { className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 animate-fade-in" },
+                            React.createElement('h3', { className: "text-xl font-semibold mb-4 flex items-center" },
+                                React.createElement(CameraIcon, { className: "mr-2 text-purple-400" }),
+                                '3D Scan'
+                            ),
+                            React.createElement('button', {
+                                onClick: loadDemoFile,
+                                disabled: isScanning3D,
+                                className: `w-full py-3 px-4 rounded-lg font-medium transition-all mb-3 ${
+                                    isScanning3D ? 'bg-purple-600 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 hover-lift'
+                                }`
+                            },
+                                React.createElement('div', { className: "flex items-center justify-center" },
+                                    isScanning3D 
+                                        ? [React.createElement(LoadingSpinner, { key: 'spinner', className: "mr-2" }), 'Loading Demo...']
+                                        : [React.createElement(CameraIcon, { key: 'icon', className: "mr-2" }), '🎬 Load Garage DEMO']
+                                )
+                            ),
+                            spatialData && React.createElement('div', { className: "mt-3 text-sm text-green-400 animate-fade-in" },
+                                `✓ ${spatialData.roomDimensions.width.toFixed(1)}×${spatialData.roomDimensions.height.toFixed(1)}×${spatialData.roomDimensions.depth.toFixed(1)}m`,
+                                React.createElement('div', { className: "text-xs text-gray-400" }, spatialData.isDemo ? '🎬 DEMO' : 'Custom file')
+                            )
+                        ),
+
+                        // AI Analyzer
+                        React.createElement('div', { className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 animate-fade-in" },
+                            React.createElement('h3', { className: "text-xl font-semibold mb-4 flex items-center" },
+                                React.createElement(BrainIcon, { className: "mr-2 text-pink-400" }),
+                                'AI Analysis'
+                            ),
+                            React.createElement('button', {
+                                onClick: analyzeWithAI,
+                                disabled: isAnalyzing || !audioData || !spatialData || !apiConfig.apiKey,
+                                className: `w-full py-3 px-4 rounded-lg font-medium transition-all ${
+                                    isAnalyzing || !audioData || !spatialData || !apiConfig.apiKey
+                                        ? 'bg-gray-600 cursor-not-allowed'
+                                        : 'bg-pink-600 hover:bg-pink-700 hover-lift'
+                                }`
+                            },
+                                React.createElement('div', { className: "flex items-center justify-center" },
+                                    isAnalyzing 
+                                        ? [React.createElement(LoadingSpinner, { key: 'spinner', className: "mr-2" }), 'Analyzing...']
+                                        : [React.createElement(BrainIcon, { key: 'icon', className: "mr-2" }), 'Generate DSP Chain']
+                                )
+                            ),
+                            !apiConfig.apiKey && React.createElement('p', { className: "text-xs text-red-400 mt-2 text-center" }, '⚠️ Configure API key first'),
+                            (!audioData || !spatialData) && React.createElement('p', { className: "text-xs text-yellow-400 mt-2 text-center" }, '📝 Record audio and load 3D scan first'),
+                            aiAnalysis && React.createElement('p', { className: "text-sm text-green-400 mt-3" }, `✓ Score: ${aiAnalysis.score}/10`)
+                        )
+                    ),
+
+                    // Real-time FFT (when microphone is active)
+                    microphoneStatus === 'granted' && React.createElement(RealTimeFFT, {
+                        frequencyData: realTimeFFT,
+                        deviationData: deviationData
+                    }),
+
+                    // Material Assignment (when surfaces are available)
+                    surfaces.length > 0 && React.createElement(MaterialAssignment, {
+                        surfaces: surfaces,
+                        selectedMaterials: selectedMaterials,
+                        spatialData: spatialData,
+                        demoLoaded: demoLoaded,
+                        onMaterialChange: (surfaceId, materialKey) => {
+                            setSelectedMaterials(prev => ({ ...prev, [surfaceId]: materialKey }));
+                            if (spatialData) visualize3DData(spatialData);
+                        }
+                    }),
+
+                    // 3D Visualization and EQ
+                    React.createElement('div', { className: "grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8" },
+                        React.createElement(Visualization3D, {
+                            canvasRef: canvasRef,
+                            spatialData: spatialData
+                        }),
+                        React.createElement(Equalizer16Band, {
+                            eqSettings: eqSettings,
+                            aiAnalysis: aiAnalysis,
+                            onEQChange: setEqSettings
+                        })
+                    ),
+
+                    // DSP Chain Display
+                    dspChain.length > 0 && React.createElement(DSPChainDisplay, {
+                        dspChain: dspChain,
+                        aiAnalysis: aiAnalysis
+                    }),
+
+                    // Analysis Results
+                    aiAnalysis && React.createElement(AnalysisResults, {
+                        aiAnalysis: aiAnalysis,
+                        spatialData: spatialData,
+                        surfaces: surfaces,
+                        selectedMaterials: selectedMaterials,
+                        dspChain: dspChain
+                    }),
+
+                    // Export Controls
+                    React.createElement(ExportControls, {
+                        aiAnalysis: aiAnalysis,
+                        audioData: audioData,
+                        spatialData: spatialData,
+                        surfaces: surfaces,
+                        selectedMaterials: selectedMaterials,
+                        dspChain: dspChain,
+                        eqSettings: eqSettings,
+                        onReset: resetAnalysis
+                    }),
+
+                    // Footer
+                    React.createElement('div', { className: "mt-12 text-center text-gray-400 text-sm animate-fade-in" },
+                        React.createElement('div', { className: "mb-4" },
+                            React.createElement('a', {
+                                href: "https://github.com/ninuxi/acoustic-space-analyzer-ai-pro",
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                className: "inline-flex items-center hover:text-white transition-colors"
+                            },
+                                React.createElement(GithubIcon, { className: "mr-2" }),
+                                'Acoustic Space Analyzer AI Pro'
+                            )
+                        ),
+                        React.createElement('div', { className: "space-y-1" },
+                            React.createElement('p', null, '🎚️ Professional acoustic analysis tool with AI-powered DSP chain generation'),
+                            React.createElement('p', null, '📡 Working online demo • 🔧 Open Source'),
+                            React.createElement('p', null,
+                                'Technologies: React • Three.js • Web Audio API • ',
+                                React.createElement('a', {
+                                    href: "https://openrouter.ai",
+                                    target: "_blank",
+                                    rel: "noopener noreferrer",
+                                    className: "ml-1 text-blue-400 hover:underline"
+                                }, 'OpenRouter'),
+                                ' • ',
+                                React.createElement('a', {
+                                    href: "https://console.groq.com",
+                                    target: "_blank", 
+                                    rel: "noopener noreferrer",
+                                    className: "ml-1 text-blue-400 hover:underline"
+                                }, 'Groq')
+                            )
+                        )
+                    )
+                )
+            );
+        };
+
+        // Render the application
+        ReactDOM.render(React.createElement(AcousticAnalyzerAI), document.getElementById('root'));
+    </script>
+</body>
+</html>                                ...Object.entries(MATERIALS).map(([key, mat]) => 
+                                    React.createElement('option', { key: key, value: key }, mat.name)
+                                )
+                            ),
+                            selectedMaterials[surface.id] && React.createElement('div', {
+                                className: "mt-2 h-3 rounded",
+                                style: { backgroundColor: MATERIALS[selectedMaterials[surface.id]].color }
+                            })
+                        )
+                    )
+                ),
+                
+                acoustics && React.createElement('div', { className: "mt-6 grid grid-cols-1 md:grid-cols-2 gap-4" },
+                    React.createElement('div', { className: "p-4 bg-gray-700/30 rounded-lg" },
+                        React.createElement('h4', { className: "font-semibold text-cyan-400 mb-2" }, 'RT60 Analysis'),
+                        React.createElement('div', { className: "space-y-1 text-sm" },
+                            ...Object.entries(acoustics.rt60).map(([freq, rt60]) => 
+                                React.createElement('div', { key: freq, className: "flex justify-between" },
+                                    React.createElement('span', { className: "text-gray-400" }, `${freq}Hz:`),
+                                    React.createElement('span', { 
+                                        className: rt60 > 2 ? 'text-red-400' : rt60 > 1 ? 'text-yellow-400' : 'text-green-400'
+                                    }, `${rt60.toFixed(2)}s`)
+                                )
+                            )
+                        )
+                    ),
+                    React.createElement('div', { className: "p-4 bg-gray-700/30 rounded-lg" },
+                        React.createElement('h4', { className: "font-semibold text-purple-400 mb-2" }, 'Room Summary'),
+                        React.createElement('div', { className: "space-y-2 text-sm" },
+                            React.createElement('div', { className: "flex justify-between" },
+                                React.createElement('span', { className: "text-gray-400" }, 'Average RT60:'),
+                                React.createElement('span', { 
+                                    className: `font-bold ${acoustics.avgRT60 > 2 ? 'text-red-400' : acoustics.avgRT60 > 1 ? 'text-yellow-400' : 'text-green-400'}`
+                                }, `${acoustics.avgRT60.toFixed(2)}s`)
+                            ),
+                            React.createElement('div', { className: "flex justify-between" },
+                                React.createElement('span', { className: "text-gray-400" }, 'Room Type:'),
+                                React.createElement('span', { className: "text-blue-300" }, 
+                                    acoustics.avgRT60 > 2 ? 'Very Reverberant' :
+                                    acoustics.avgRT60 > 1.5 ? 'Reverberant' :
+                                    acoustics.avgRT60 > 0.8 ? 'Medium' :
+                                    acoustics.avgRT60 > 0.4 ? 'Dry' : 'Very Dry'
+                                )
+                            )
+                        )
+                    )
+                )
+            );
+        };
+
+        // 16-Band Equalizer Component
+        const Equalizer16Band = ({ eqSettings, onEQChange, aiAnalysis }) => {
+            return React.createElement('div', {
+                className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 animate-fade-in"
+            },
+                React.createElement('h3', { className: "text-xl font-semibold mb-4" }, '16-Band Equalizer'),
+                React.createElement('div', { className: "flex items-end justify-between h-48 px-4" },
+                    ...EQ_FREQUENCIES.map((freq, index) => 
+                        React.createElement('div', { key: freq, className: "flex flex-col items-center" },
+                            React.createElement('div', { className: "relative h-32 flex items-center" },
+                                React.createElement('input', {
+                                    type: "range",
+                                    min: "-12",
+                                    max: "12",
+                                    step: "0.5",
+                                    value: eqSettings[freq] || 0,
+                                    onChange: (e) => onEQChange({ ...eqSettings, [freq]: parseFloat(e.target.value) }),
+                                    className: "eq-slider",
+                                    style: {
+                                        transform: 'rotate(-90deg)',
+                                        transformOrigin: 'center',
+                                        width: '120px',
+                                        marginLeft: '-46px',
+                                        marginRight: '-46px'
+                                    }
+                                })
+                            ),
+                            React.createElement('div', { className: "text-xs text-gray-400 mt-2 transform -rotate-45 origin-top-left" },
+                                freq >= 1000 ? `${freq/1000}k` : freq
+                            ),
+                            React.createElement('div', {
+                                className: `text-xs mt-1 ${
+                                    eqSettings[freq] > 0 ? 'text-green-400' : 
+                                    eqSettings[freq] < 0 ? 'text-red-400' : 'text-gray-400'
+                                }`
+                            }, `${eqSettings[freq] > 0 ? '+' : ''}${(eqSettings[freq] || 0).toFixed(1)}`)
+                        )
+                    )
+                ),
+                React.createElement('div', { className: "mt-4 flex justify-center space-x-4" },
+                    React.createElement('button', {
+                        onClick: () => onEQChange(EQ_FREQUENCIES.reduce((acc, freq) => ({ ...acc, [freq]: 0 }), {})),
+                        className: "px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded transition-all hover-lift"
+                    }, 'Reset'),
+                    aiAnalysis?.eqCurve && React.createElement('button', {
+                        onClick: () => {
+                            const newSettings = {};
+                            EQ_FREQUENCIES.forEach(freq => {
+                                newSettings[freq] = aiAnalysis.eqCurve[freq] !== undefined ? aiAnalysis.eqCurve[freq] : (eqSettings[freq] || 0);
+                            });
+                            onEQChange(newSettings);
+                        },
+                        className: "px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition-all hover-lift"
+                    }, 'Apply AI')
+                )
+            );
+        };
+
+        // 3D Visualization Component
+        const Visualization3D = ({ canvasRef, spatialData }) => {
+            return React.createElement('div', {
+                className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 animate-fade-in"
+            },
+                React.createElement('h3', { className: "text-xl font-semibold mb-4" }, '3D Visualization'),
+                React.createElement('div', { className: "flex justify-center" },
+                    React.createElement('div', { className: "canvas-container" },
+                        React.createElement('canvas', { ref: canvasRef, className: "border border-gray-600 rounded-lg" })
+                    )
+                ),
+                spatialData && React.createElement('div', { className: "mt-4 grid grid-cols-3 gap-4 text-sm" },
+                    React.createElement('div', { className: "text-center" },
+                        React.createElement('div', { className: "text-2xl font-bold text-blue-400" }, spatialData.volume.toFixed(1)),
+                        React.createElement('div', { className: "text-gray-400" }, 'm³ Volume')
+                    ),
+                    React.createElement('div', { className: "text-center" },
+                        React.createElement('div', { className: "text-2xl font-bold text-purple-400" }, spatialData.surfaceArea.toFixed(1)),
+                        React.createElement('div', { className: "text-gray-400" }, 'm² Surface')
+                    ),
+                    React.createElement('div', { className: "text-center" },
+                        React.createElement('div', { className: "text-2xl font-bold text-green-400" }, (spatialData.volume / spatialData.surfaceArea).toFixed(2)),
+                        React.createElement('div', { className: "text-gray-400" }, 'V/S Ratio')
+                    )
+                ),
+                spatialData?.isDemo && React.createElement('div', { className: "mt-4 text-xs text-blue-300 text-center" },
+                    '🎬 3D demo model: Empty garage with simulated acoustic treatments'
+                )
+            );
+        };
+
+        // DSP Chain Display Component
+        const DSPChainDisplay = ({ dspChain, aiAnalysis }) => {
+            if (!dspChain.length) return null;
+
+            return React.createElement('div', {
+                className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700 animate-fade-in"
+            },
+                React.createElement('h3', { className: "text-xl font-semibold mb-4" }, 'Recommended DSP Chain'),
+                React.createElement('div', { className: "bg-gray-900/50 p-6 rounded-lg border border-gray-600" },
+                    React.createElement('div', { className: "flex items-center justify-between overflow-x-auto pb-4" },
+                        ...dspChain.map((processor, index) => 
+                            React.createElement(React.Fragment, { key: index },
+                                React.createElement('div', { className: "flex-shrink-0" },
+                                    React.createElement('div', { className: "dsp-card rounded-lg p-4 min-w-[200px] transform hover:scale-105 transition-transform cursor-pointer" },
+                                        React.createElement('div', { className: "text-center mb-2" },
+                                            React.createElement('div', { className: "text-lg font-bold text-white" },
+                                                DSP_PROCESSORS[processor.type]?.name || processor.type
+                                            ),
+                                            React.createElement('div', { className: "text-xs text-gray-200 opacity-80" },
+                                                processor.type.toUpperCase()
+                                            )
+                                        ),
+                                        React.createElement('div', { className: "space-y-1 mt-3" },
+                                            ...Object.entries(processor.params).slice(0, 3).map(([param, value]) => 
+                                                React.createElement('div', { key: param, className: "flex justify-between text-xs" },
+                                                    React.createElement('span', { className: "text-gray-200" }, `${param}:`),
+                                                    React.createElement('span', { className: "font-mono text-yellow-300" },
+                                                        typeof value === 'number' ? value.toFixed(1) : value
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    ),
+                                    React.createElement('div', { className: "text-xs text-gray-400 text-center mt-2 max-w-[200px]" },
+                                        processor.description
+                                    )
+                                ),
+                                index < dspChain.length - 1 && React.createElement('div', { className: "flex-shrink-0 px-4" },
+                                    React.createElement('svg', { width: "40", height: "40", viewBox: "0 0 40 40" },
+                                        React.createElement('defs', null,
+                                            React.createElement('marker', {
+                                                id: "arrowhead",
+                                                markerWidth: "10",
+                                                markerHeight: "7",
+                                                refX: "9",
+                                                refY: "3.5",
+                                                orient: "auto"
+                                            }, React.createElement('polygon', { points: "0 0, 10 3.5, 0 7", fill: "#9333ea" }))
+                                        ),
+                                        React.createElement('line', {
+                                            x1: "5", y1: "20", x2: "35", y2: "20",
+                                            stroke: "#9333ea", strokeWidth: "3", markerEnd: "url(#arrowhead)"
+                                        })
+                                    )
+                                )
+                            )
+                        )
+                    ),
+                    React.createElement('div', { className: "mt-6 grid grid-cols-2 md:grid-cols-4 gap-4" },
+                        React.createElement('div', { className: "bg-gray-800 p-3 rounded-lg text-center" },
+                            React.createElement('div', { className: "text-2xl font-bold text-cyan-400" }, dspChain.length),
+                            React.createElement('div', { className: "text-xs text-gray-400" }, 'Processors')
+                        ),
+                        React.createElement('div', { className: "bg-gray-800 p-3 rounded-lg text-center" },
+                            React.createElement('div', { className: "text-2xl font-bold text-green-400" },
+                                dspChain.filter(p => p.type === 'eq').length
+                            ),
+                            React.createElement('div', { className: "text-xs text-gray-400" }, 'EQ Bands')
+                        ),
+                        React.createElement('div', { className: "bg-gray-800 p-3 rounded-lg text-center" },
+                            React.createElement('div', { className: "text-2xl font-bold text-purple-400" },
+                                dspChain.find(p => p.type === 'hpf')?.params.frequency || 'N/A'
+                            ),
+                            React.createElement('div', { className: "text-xs text-gray-400" }, 'HPF (Hz)')
+                        ),
+                        React.createElement('div', { className: "bg-gray-800 p-3 rounded-lg text-center" },
+                            React.createElement('div', { className: "text-2xl font-bold text-yellow-400" },
+                                aiAnalysis?.score || 'N/A'
+                            ),
+                            React.createElement('div', { className: "text-xs text-gray-400" }, 'Score')
+                        )
+                    )
+                )
+            );
+        };
+
+        // Analysis Results Component
+        const AnalysisResults = ({ aiAnalysis, spatialData, surfaces, selectedMaterials, dspChain }) => {
+            if (!aiAnalysis) return null;
+
+            // Calculate room acoustics
+            const calculateRoomAcoustics = () => {
+                if (!spatialData || !surfaces.length) return null;
+                const { volume, surfaceArea } = spatialData;
+                const frequencyBands = [125, 250, 500, 1000, 2000, 4000];
+                
+                const absorption = frequencyBands.reduce((acc, freq) => {
+                    let totalAbsorption = 0;
+                    surfaces.forEach(surface => {
+                        const materialKey = selectedMaterials[surface.id];
+                        if (materialKey && MATERIALS[materialKey]) {
+                            const material = MATERIALS[materialKey];
+                            totalAbsorption += surface.area * (material.absorption[freq] || 0.05);
+                        }
+                    });
+                    acc[freq] = totalAbsorption;
+                    return acc;
+                }, {});
+                
+                const rt60 = frequencyBands.reduce((acc, freq) => {
+                    const A = absorption[freq];
+                    acc[freq] = A > 0 ? (0.161 * volume) / A : 10;
+                    return acc;
+                }, {});
+                
+                const avgRT60 = Object.values(rt60).reduce((a, b) => a + b, 0) / frequencyBands.length;
+                return { absorption, rt60, avgRT60, volume, surfaceArea };
+            };
+
+            const acoustics = calculateRoomAcoustics();
+
+            return React.createElement('div', {
+                className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700 animate-fade-in"
+            },
+                React.createElement('h3', { className: "text-xl font-semibold mb-4" }, 'AI Analysis Results'),
+                
+                React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" },
+                    React.createElement('div', { className: "bg-gradient-to-r from-green-900/30 to-green-800/30 p-4 rounded-lg border border-green-700/30" },
+                        React.createElement('div', { className: "text-3xl font-bold text-green-400" }, `${aiAnalysis.score}/10`),
+                        React.createElement('div', { className: "text-sm text-gray-300" }, 'Quality Score')
+                    ),
+                    React.createElement('div', { className: "bg-gradient-to-r from-blue-900/30 to-blue-800/30 p-4 rounded-lg border border-blue-700/30" },
+                        React.createElement('div', { className: "text-3xl font-bold text-blue-400" },
+                            `${acoustics?.avgRT60.toFixed(2)}s`
+                        ),
+                        React.createElement('div', { className: "text-sm text-gray-300" }, 'Avg RT60')
+                    ),
+                    React.createElement('div', { className: "bg-gradient-to-r from-purple-900/30 to-purple-800/30 p-4 rounded-lg border border-purple-700/30" },
+                        React.createElement('div', { className: "text-3xl font-bold text-purple-400" }, dspChain.length),
+                        React.createElement('div', { className: "text-sm text-gray-300" }, 'DSP Processors')
+                    ),
+                    React.createElement('div', { className: "bg-gradient-to-r from-cyan-900/30 to-cyan-800/30 p-4 rounded-lg border border-cyan-700/30" },
+                        React.createElement('div', { className: "text-3xl font-bold text-cyan-400" },
+                            surfaces.filter(s => selectedMaterials[s.id]).length
+                        ),
+                        React.createElement('div', { className: "text-sm text-gray-300" }, 'Treated Surfaces')
+                    )
+                ),
+                
+                React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-6" },
+                    React.createElement('div', null,
+                        React.createElement('h4', { className: "font-semibold text-red-400 mb-2" }, 'Identified Problems:'),
+                        React.createElement('ul', { className: "space-y-1 text-sm" },
+                            ...(aiAnalysis.problems || []).map((problem, index) => 
+                                React.createElement('li', { key: index, className: "text-gray-300 flex items-start" },
+                                    React.createElement('span', { className: "text-red-400 mr-2" }, '•'),
+                                    problem
+                                )
+                            )
+                        )
+                    ),
+                    React.createElement('div', null,
+                        React.createElement('h4', { className: "font-semibold text-green-400 mb-2" }, 'Suggestions:'),
+                        React.createElement('ul', { className: "space-y-1 text-sm" },
+                            ...(aiAnalysis.suggestions || []).map((suggestion, index) => 
+                                React.createElement('li', { key: index, className: "text-gray-300 flex items-start" },
+                                    React.createElement('span', { className: "text-green-400 mr-2" }, '•'),
+                                    suggestion
+                                )
+                            )
+                        )
+                    )
+                )
+            );
+        };
+
+        // Export Controls Component
+        const ExportControls = ({ aiAnalysis, audioData, spatialData, surfaces, selectedMaterials, dspChain, eqSettings, onReset }) => {
+            const exportResults = () => {
+                if (!aiAnalysis) return;
+                
+                const exportData = {
+                    timestamp: new Date().toISOString(),
+                    audioData: {
+                        samples: audioData?.length || 0,
+                        duration: '15 seconds',
+                        sampleRate: 48000,
+                        fftSize: 16384
+                    },
+                    spatialData,
+                    materials: surfaces.map(s => ({
+                        surface: s.name,
+                        material: MATERIALS[selectedMaterials[s.id]]?.name || 'Not assigned',
+                        area: s.area
+                    })),
+                    aiAnalysis,
+                    dspChain,
+                    eqSettings
+                };
+                
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `acoustic-analysis-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            return React.createElement('div', {
+                className: "flex flex-col sm:flex-row gap-4 justify-center mb-8"
+            },
+                React.createElement('button', {
+                    onClick: exportResults,
+                    disabled: !aiAnalysis,
+                    className: `py-3 px-6 rounded-lg font-medium transition-all ${
+                        !aiAnalysis ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 hover-lift'
+                    }`
+                },
+                    React.createElement(DownloadIcon, { className: "inline mr-2" }),
+                    'Export JSON'
+                ),
+                React.createElement('button', {
+                    onClick: onReset,
+                    className: "py-3 px-6 rounded-lg font-medium bg-gray-600 hover:bg-gray-700 transition-all hover-lift"
+                },
+                    React.createElement(RotateCcwIcon, { className: "inline mr-2" }),
+                    'Complete Reset'
+                )
+            );
+        };
+
+        // Main Application Component
+        const AcousticAnalyzerAI = () => {
+            // State Management
+            const [isRecording, setIsRecording] = useState(false);
+            const [recordingTime, setRecordingTime] = useState(0);
+            const [isScanning3D, setIsScanning3D] = useState(false);
+            const [audioData, setAudioData] = useState(null);
+            const [spatialData, setSpatialData] = useState(null);
+            const [aiAnalysis, setAiAnalysis] = useState(null);
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [realTimeFFT, setRealTimeFFT] = useState([]);
+            const [deviationData, setDeviationData] = useState([]);
+            const [uploadedFile, setUploadedFile] = useState(null);
+            const [microphoneStatus, setMicrophoneStatus] = useState('not-initialized');
+            const [selectedMaterials, setSelectedMaterials] = useState({});
+            const [surfaces, setSurfaces] = useState([]);
+            const [dspChain, setDspChain] = useState([]);
+            const [eqSettings, setEqSettings] = useState(
+                EQ_FREQUENCIES.reduce((acc, freq) => ({ ...acc, [freq]: 0 }), {})
+            );
+            const [demoLoaded, setDemoLoaded] = useState(false);
+            const [apiConfig, setApiConfig] = useState({
+                provider: 'openrouter',
+                apiKey: '',
+                model: 'deepseek/deepseek-r1-distill-llama-70b'
+            });
+
+            // Refs
+            const audioContextRef = useRef(null);
+            const analyserRef = useRef(null);
+            const microphoneRef = useRef(null);
+            const animationRef = useRef(null);
+            const recordingIntervalRef = useRef(null);
+            const canvasRef = useRef(null);
+            const sceneRef = useRef(null);
+            const rendererRef = useRef(null);
+            const cameraRef = useRef(null);
+
+            // Cleanup on unmount
+            useEffect(() => {
+                initialize3DVisualization();
+                loadApiConfig();
+                return () => {
+                    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+                    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                        audioContextRef.current.close();
+                    }
+                    if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+                };
+            }, []);
+
+            // Load API configuration from localStorage
+            const loadApiConfig = () => {
+                try {
+                    const saved = localStorage.getItem('acousticAnalyzerApiConfig');
+                    if (saved) setApiConfig(JSON.parse(saved));
+                } catch (e) {
+                    console.error('Failed to load API config:', e);
+                }
+            };
+
+            // Save API configuration
+            const saveApiConfig = (config) => {
+                setApiConfig(config);
+                try {
+                    localStorage.setItem('acousticAnalyzerApiConfig', JSON.stringify(config));
+                } catch (e) {
+                    console.error('Failed to save API config:', e);
+                }
+            };
+
+            // Initialize audio system
+            const initializeAudio = async () => {
+                try {
+                    setMicrophoneStatus('requesting');
+                    
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    audioContextRef.current = new AudioContext({
+                        sampleRate: 48000,
+                        latencyHint: 'interactive'
+                    });
+                    
+                    if (audioContextRef.current.state === 'suspended') {
+                        await audioContextRef.current.resume();
+                    }
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: { 
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                            sampleRate: 48000,
+                            channelCount: 1
+                        } 
+                    });
+                    
+                    analyserRef.current = audioContextRef.current.createAnalyser();
+                    analyserRef.current.fftSize = 16384;
+                    analyserRef.current.smoothingTimeConstant = 0.1;
+                    
+                    microphoneRef.current = audioContextRef.current.createMediaStreamSource(stream);
+                    microphoneRef.current.connect(analyserRef.current);
+                    
+                    setMicrophoneStatus('granted');
+                    startRealTimeFFT();
+                    console.log('Audio system initialized');
+                    
+                } catch (error) {
+                    console.error('Audio initialization error:', error);
+                    setMicrophoneStatus('denied');
+                    alert('Microphone access denied. Please allow access and try again.');
+                }
+            };
+
+            // Start real-time FFT visualization
+            const startRealTimeFFT = () => {
+                if (!analyserRef.current) return;
+                
+                const updateFFT = () => {
+                    if (microphoneStatus === 'granted' && analyserRef.current && audioContextRef.current) {
+                        const analysis = performFFTAnalysis();
+                        if (analysis) {
+                            setRealTimeFFT(analysis.frequencyResponse);
+                            setDeviationData(analysis.frequencyResponse.map(f => f.deviation));
+                        }
+                    }
+                    animationRef.current = requestAnimationFrame(updateFFT);
+                };
+                updateFFT();
+            };
+
+            // Perform FFT analysis
+            const performFFTAnalysis = () => {
+                if (!analyserRef.current || !audioContextRef.current) return null;
+                
+                const bufferLength = analyserRef.current.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                const floatArray = new Float32Array(bufferLength);
+                
+                analyserRef.current.getByteFrequencyData(dataArray);
+                analyserRef.current.getFloatFrequencyData(floatArray);
+                
+                const sampleRate = audioContextRef.current.sampleRate;
+                const nyquist = sampleRate / 2;
+                
+                const frequencyResponse = EQ_FREQUENCIES.map(freq => {
+                    const index = Math.round((freq / nyquist) * bufferLength);
+                    const amplitude = dataArray[index] || 0;
+                    const dbFS = floatArray[index] || -Infinity;
+                    const dbSPL = dbFS + 94;
+                    const reference = PINK_NOISE_REFERENCE[freq] || 70;
+                    const deviation = dbSPL - reference;
+                    
+                    return { frequency: freq, amplitude, dbFS, dbSPL, deviation, reference };
+                });
+                
+                const rms = Math.sqrt(dataArray.reduce((sum, val) => sum + (val/255) * (val/255), 0) / bufferLength);
+                const dbRMS = 20 * Math.log10(rms + 1e-10);
+                const peakLevel = Math.max(...dataArray);
+                const crestFactor = peakLevel / (rms * 255);
+                
+                return { timestamp: Date.now(), frequencyResponse, rms, dbRMS, peakLevel, crestFactor };
+            };
+
+            // Start recording
+            const startRecording = async () => {
+                if (microphoneStatus !== 'granted') {
+                    await initializeAudio();
+                    if (microphoneStatus !== 'granted') return;
+                }
+                
+                setIsRecording(true);
+                setRecordingTime(0);
+                setAudioData([]);
+                
+                const startTime = Date.now();
+                recordingIntervalRef.current = setInterval(() => {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    setRecordingTime(elapsed);
+                    
+                    const analysis = performFFTAnalysis();
+                    if (analysis) {
+                        setAudioData(prev => [...(prev || []), analysis]);
+                    }
+                    
+                    if (elapsed >= 15) {
+                        stopRecording();
+                    }
+                }, 100);
+            };
+
+            // Stop recording
+            const stopRecording = () => {
+                if (recordingIntervalRef.current) {
+                    clearInterval(recordingIntervalRef.current);
+                    recordingIntervalRef.current = null;
+                }
+                setIsRecording(false);
+                console.log('Recording completed');
+            };
+
+            // Initialize 3D visualization
+            const initialize3DVisualization = () => {
+                if (!canvasRef.current) return;
+                
+                try {
+                    const scene = new THREE.Scene();
+                    scene.background = new THREE.Color(0x0a0a0a);
+                    scene.fog = new THREE.Fog(0x0a0a0a, 10, 50);
+                    
+                    const camera = new THREE.PerspectiveCamera(75,<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acoustic Space Analyzer AI Pro</title>
+    
+    <!-- External Dependencies -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            background: #0a0a0a;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        }
+
+        #root {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 25%, #312e81 50%, #1e40af 75%, #0f172a 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 20s ease infinite;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1a1a1a; }
+        ::-webkit-scrollbar-thumb { background: #4a4a4a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #5a5a5a; }
+
+        /* Animations */
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInUp { from { transform: translate3d(0, 100%, 0); opacity: 0; } to { transform: translate3d(0, 0, 0); opacity: 1; } }
+        @keyframes demoBanner { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        @keyframes waveform { 0%, 100% { height: 20%; } 50% { height: 100%; } }
+        @keyframes spectrum { 0% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } 100% { transform: scaleY(0.3); } }
+
+        /* Utility Classes */
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .animate-spin { animation: spin 1s linear infinite; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        .animate-slide-up { animation: slideInUp 0.6s ease-out; }
+
+        /* Demo banner */
+        .demo-banner {
+            background: linear-gradient(90deg, #f59e0b, #ef4444, #8b5cf6);
+            background-size: 200% 100%;
+            animation: demoBanner 3s ease infinite;
+        }
+
+        /* Gradient text */
+        .gradient-text {
+            background: linear-gradient(135deg, #06b6d4, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            background-size: 200% 200%;
+            animation: gradientShift 4s ease infinite;
+        }
+
+        /* Button Effects */
+        button { position: relative; overflow: hidden; transition: all 0.3s ease; }
+        button:active { transform: scale(0.98); }
+        .hover-lift:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3); }
+
+        /* EQ Slider */
+        .eq-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 120px;
+            background: transparent;
+            outline: none;
+            writing-mode: bt-lr;
+            -webkit-appearance: slider-vertical;
+            cursor: pointer;
+        }
+
+        .eq-slider::-webkit-slider-track {
+            width: 8px;
+            background: linear-gradient(to top, #dc2626, #fbbf24, #10b981);
+            border-radius: 4px;
+        }
+
+        .eq-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 12px;
+            background: linear-gradient(135deg, #10b981, #06b6d4);
+            cursor: pointer;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+
+        /* FFT Visualization */
+        .fft-bar {
+            background: linear-gradient(to top, #dc2626 0%, #f59e0b 30%, #10b981 60%, #06b6d4 100%);
+            transition: height 0.1s ease-out;
+            border-radius: 2px 2px 0 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .fft-bar::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(45deg, transparent 40%, rgba(255, 255, 255, 0.1) 50%, transparent 60%);
+            animation: spectrum 2s ease infinite;
+        }
+
+        /* 3D Canvas */
+        .canvas-container {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* DSP Chain Cards */
+        .dsp-card {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dsp-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .dsp-card:hover::before { left: 100%; }
+
+        /* Progress Bars */
+        .progress-bar { background: rgba(55, 65, 81, 0.8); overflow: hidden; position: relative; }
+        .progress-fill {
+            background: linear-gradient(90deg, #06b6d4, #8b5cf6, #ec4899);
+            background-size: 200% 100%;
+            animation: gradientShift 2s ease infinite;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect, useCallback } = React;
+
+        // Extended Materials Database
+        const MATERIALS = {
+            'plasterboard': { name: 'Plasterboard', absorption: { 125: 0.29, 250: 0.10, 500: 0.05, 1000: 0.04, 2000: 0.07, 4000: 0.09 }, color: '#e0e0e0', category: 'wall' },
+            'concrete': { name: 'Concrete', absorption: { 125: 0.01, 250: 0.01, 500: 0.02, 1000: 0.02, 2000: 0.03, 4000: 0.03 }, color: '#808080', category: 'structural' },
+            'brick': { name: 'Brick', absorption: { 125: 0.03, 250: 0.03, 500: 0.03, 1000: 0.04, 2000: 0.05, 4000: 0.07 }, color: '#a52a2a', category: 'wall' },
+            'carpet': { name: 'Carpet', absorption: { 125: 0.08, 250: 0.24, 500: 0.57, 1000: 0.69, 2000: 0.71, 4000: 0.73 }, color: '#8b0000', category: 'floor' },
+            'acoustic_panel': { name: 'Acoustic Panel', absorption: { 125: 0.20, 250: 0.65, 500: 0.85, 1000: 0.95, 2000: 0.95, 4000: 0.90 }, color: '#2f4f4f', category: 'treatment' },
+            'hardwood': { name: 'Hardwood Floor', absorption: { 125: 0.04, 250: 0.04, 500: 0.07, 1000: 0.06, 2000: 0.06, 4000: 0.07 }, color: '#daa520', category: 'floor' },
+            'glass': { name: 'Glass', absorption: { 125: 0.35, 250: 0.25, 500: 0.18, 1000: 0.12, 2000: 0.07, 4000: 0.04 }, color: '#87ceeb', category: 'wall' },
+            'fabric_upholstery': { name: 'Fabric Upholstery', absorption: { 125: 0.08, 250: 0.25, 500: 0.45, 1000: 0.65, 2000: 0.75, 4000: 0.80 }, color: '#6b4423', category: 'treatment' },
+            'foam_panel': { name: 'Foam Panel', absorption: { 125: 0.12, 250: 0.45, 500: 0.80, 1000: 0.95, 2000: 0.90, 4000: 0.85 }, color: '#2f2f2f', category: 'treatment' },
+            'rockwool_panel': { name: 'Rockwool Panel', absorption: { 125: 0.25, 250: 0.70, 500: 0.90, 1000: 0.95, 2000: 0.98, 4000: 0.95 }, color: '#8b7355', category: 'treatment' }
+        };
+
+        const EQ_FREQUENCIES = [20, 31.5, 63, 125, 250, 500, 1000, 2000, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000];
+        const PINK_NOISE_REFERENCE = { 20: 85, 31.5: 83, 63: 81, 125: 79, 250: 77, 500: 75, 1000: 73, 2000: 71, 3150: 69, 4000: 68, 5000: 67, 6300: 66, 8000: 65, 10000: 64, 12500: 63, 16000: 62 };
+        
+        // DSP Processors
+        const DSP_PROCESSORS = {
+            eq: { name: 'Parametric EQ', params: ['frequency', 'gain', 'q'], color: '#10b981' },
+            compressor: { name: 'Compressor', params: ['threshold', 'ratio', 'attack', 'release', 'knee'], color: '#f59e0b' },
+            limiter: { name: 'Limiter', params: ['threshold', 'release', 'lookahead'], color: '#ef4444' },
+            gate: { name: 'Noise Gate', params: ['threshold', 'attack', 'hold', 'release'], color: '#8b5cf6' },
+            reverb: { name: 'Reverb', params: ['roomSize', 'damping', 'wetLevel', 'dryLevel'], color: '#06b6d4' },
+            delay: { name: 'Delay', params: ['time', 'feedback', 'mix'], color: '#ec4899' },
+            hpf: { name: 'High-pass Filter', params: ['frequency', 'q'], color: '#84cc16' },
+            lpf: { name: 'Low-pass Filter', params: ['frequency', 'q'], color: '#f97316' }
+        };
+
+        // Icon Components
+        const MicIcon = ({ size = 24, className = "" }) => (
+            React.createElement('svg', { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: className },
+                React.createElement('path', { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }),
+                React.createElement('path', { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
+                React.createElement('line', { x1: "12", x2: "12", y1: "19", y2: "22" })
+            )
+        );
+
+        const CameraIcon = ({ size = 24, className = "" }) => (
+            React.createElement('svg', { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: className },
+                React.createElement('path', { d: "M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" }),
+                React.createElement('circle', { cx: "12", cy: "13", r: "3" })
+            )
+        );
+
+        const BrainIcon = ({ size = 24, className = "" }) => (
+            React.createElement('svg', { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: className },
+                React.createElement('path', { d: "M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" }),
+                React.createElement('path', { d: "M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" })
+            )
+        );
+
+        const PlayIcon = ({ size = 20, className = "" }) => (
+            React.createElement('svg', { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: className },
+                React.createElement('polygon', { points: "6 3 20 12 6 21 6 3" })
+            )
+        );
+
+        const StopIcon = ({ size = 20, className = "" }) => (
+            React.createElement('svg', { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: className },
+                React.createElement('rect', { x: "5", y: "5", width: "14", height: "14", rx: "2" })
+            )
+        );
+
+        const KeyIcon = ({ size = 20, className = "" }) => (
+            React.createElement('svg', { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: className },
+                React.createElement('circle', { cx: "7.5", cy: "15.5", r: "5.5" }),
+                React.createElement('path', { d: "m21 2-9.6 9.6" })
+            )
+        );
+
+        const GithubIcon = ({ size = 20, className = "" }) => (
+            React.createElement('svg', { width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", className: className },
+                React.createElement('path', { d: "M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" })
+            )
+        );
+
+        const LoadingSpinner = ({ size = 20, className = "" }) => (
+            React.createElement('svg', { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: `animate-spin ${className}` },
+                React.createElement('path', { d: "M21 12A9 9 0 1 1 12 3" })
+            )
+        );
+
+        const DownloadIcon = ({ size = 20, className = "" }) => (
+            React.createElement('svg', { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: className },
+                React.createElement('path', { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }),
+                React.createElement('polyline', { points: "7 10 12 15 17 10" }),
+                React.createElement('line', { x1: "12", x2: "12", y1: "15", y2: "3" })
+            )
+        );
+
+        const RotateCcwIcon = ({ size = 20, className = "" }) => (
+            React.createElement('svg', { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: className },
+                React.createElement('path', { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }),
+                React.createElement('path', { d: "M3 3v5h5" })
+            )
+        );
+
+        // Demo Banner Component
+        const DemoBanner = () => {
+            const [isVisible, setIsVisible] = useState(true);
+            const [timeLeft, setTimeLeft] = useState('');
+
+            useEffect(() => {
+                const timer = setTimeout(() => setIsVisible(false), 10000);
+                return () => clearTimeout(timer);
+            }, []);
+
+            useEffect(() => {
+                const updateTime = () => {
+                    const now = new Date();
+                    const hours = now.getHours().toString().padStart(2, '0');
+                    const minutes = now.getMinutes().toString().padStart(2, '0');
+                    setTimeLeft(`${hours}:${minutes}`);
+                };
+                updateTime();
+                const interval = setInterval(updateTime, 1000);
+                return () => clearInterval(interval);
+            }, []);
+
+            if (!isVisible) return null;
+
+            return React.createElement('div', {
+                className: "demo-banner text-center py-3 text-white font-bold text-sm relative overflow-hidden cursor-pointer",
+                onClick: () => setIsVisible(false)
+            }, React.createElement('div', { className: "relative z-10 flex items-center justify-center space-x-4" },
+                React.createElement('span', { className: "animate-bounce" }, '🎙️'),
+                React.createElement('span', null, 'ONLINE DEMO'),
+                React.createElement('span', { className: "hidden sm:inline" }, '•'),
+                React.createElement('span', { className: "hidden sm:inline" }, 'Acoustic Space Analyzer AI Pro'),
+                React.createElement('span', { className: "text-yellow-300" }, '•'),
+                React.createElement('span', { className: "font-mono text-xs" }, timeLeft),
+                React.createElement('button', {
+                    className: "ml-4 hover:bg-white/20 rounded p-1 transition-colors",
+                    onClick: (e) => { e.stopPropagation(); setIsVisible(false); }
+                }, '✕')
+            ));
+        };
+
+        // Real-time FFT Visualization Component
+        const RealTimeFFT = ({ frequencyData, deviationData }) => {
+            if (!frequencyData.length) return null;
+
+            return React.createElement('div', {
+                className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700 animate-fade-in"
+            },
+                React.createElement('h3', { className: "text-xl font-semibold mb-4" }, 'Real-time Spectral Analysis'),
+                React.createElement('div', { className: "grid grid-cols-8 md:grid-cols-16 gap-1" },
+                    ...frequencyData.map((freq, index) => 
+                        React.createElement('div', { key: index, className: "text-center" },
+                            React.createElement('div', { className: "text-xs text-gray-400 mb-1 transform -rotate-45 origin-bottom-left" },
+                                freq.frequency >= 1000 ? `${freq.frequency/1000}k` : freq.frequency
+                            ),
+                            React.createElement('div', { className: "bg-gray-700 rounded h-32 relative overflow-hidden" },
+                                React.createElement('div', {
+                                    className: "absolute w-full border-t border-yellow-500 opacity-50",
+                                    style: { bottom: `${(freq.reference / 100) * 100}%` }
+                                }),
+                                React.createElement('div', {
+                                    className: `fft-bar absolute bottom-0 w-full transition-all duration-75 ${
+                                        freq.deviation > 3 ? 'bg-red-500' :
+                                        freq.deviation < -3 ? 'bg-blue-500' : 'bg-green-500'
+                                    }`,
+                                    style: { height: `${Math.max(0, Math.min(100, (freq.dbSPL / 100) * 100))}%` }
+                                })
+                            ),
+                            React.createElement('div', {
+                                className: `text-xs mt-1 ${Math.abs(freq.deviation) > 3 ? 'text-yellow-400' : 'text-gray-400'}`
+                            }, `${freq.deviation > 0 ? '+' : ''}${freq.deviation.toFixed(1)}`)
+                        )
+                    )
+                ),
+                React.createElement('div', { className: "mt-4 flex items-center justify-center space-x-8 text-sm" },
+                    React.createElement('div', { className: "flex items-center" },
+                        React.createElement('div', { className: "w-4 h-4 bg-yellow-500 mr-2" }),
+                        React.createElement('span', { className: "text-gray-400" }, 'Pink Noise Reference')
+                    ),
+                    React.createElement('div', { className: "flex items-center" },
+                        React.createElement('div', { className: "w-4 h-4 bg-green-500 mr-2" }),
+                        React.createElement('span', { className: "text-gray-400" }, 'OK Response (±3dB)')
+                    ),
+                    React.createElement('div', { className: "flex items-center" },
+                        React.createElement('div', { className: "w-4 h-4 bg-red-500 mr-2" }),
+                        React.createElement('span', { className: "text-gray-400" }, 'Excess')
+                    ),
+                    React.createElement('div', { className: "flex items-center" },
+                        React.createElement('div', { className: "w-4 h-4 bg-blue-500 mr-2" }),
+                        React.createElement('span', { className: "text-gray-400" }, 'Deficiency')
+                    )
+                )
+            );
+        };
+
+        // Material Assignment Component
+        const MaterialAssignment = ({ surfaces, selectedMaterials, onMaterialChange, spatialData, demoLoaded }) => {
+            if (!surfaces.length) return null;
+
+            // Calculate RT60
+            const calculateRT60 = () => {
+                if (!spatialData || !selectedMaterials) return null;
+                
+                const { volume } = spatialData;
+                const frequencies = [125, 250, 500, 1000, 2000, 4000];
+                
+                const rt60 = frequencies.reduce((acc, freq) => {
+                    let totalAbsorption = 0;
+                    surfaces.forEach(surface => {
+                        const materialKey = selectedMaterials[surface.id];
+                        if (materialKey && MATERIALS[materialKey]) {
+                            const material = MATERIALS[materialKey];
+                            totalAbsorption += surface.area * (material.absorption[freq] || 0.05);
+                        }
+                    });
+                    acc[freq] = totalAbsorption > 0 ? (0.161 * volume) / totalAbsorption : 10;
+                    return acc;
+                }, {});
+                
+                const avgRT60 = Object.values(rt60).reduce((a, b) => a + b, 0) / frequencies.length;
+                return { rt60, avgRT60 };
+            };
+
+            const acoustics = calculateRT60();
+
+            return React.createElement('div', {
+                className: "bg-gray-800/50 backdrop-blur rounded-xl p-6 mb-8 border border-gray-700 animate-fade-in"
+            },
+                React.createElement('h3', { className: "text-xl font-semibold mb-4" }, 'Material Assignment'),
+                
+                spatialData?.isDemo && demoLoaded && React.createElement('div', {
+                    className: "mb-4 p-3 bg-blue-900/30 border border-blue-700/30 rounded-lg"
+                }, React.createElement('p', { className: "text-sm text-blue-300" },
+                    '🎬 ', React.createElement('strong', null, 'DEMO:'), ' Materials pre-assigned for a typical garage. You can modify them to experiment.'
+                )),
+                
+                React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" },
+                    ...surfaces.map(surface => 
+                        React.createElement('div', { key: surface.id, className: "bg-gray-700/50 p-4 rounded-lg" },
+                            React.createElement('h4', { className: "font-medium mb-2" }, surface.name),
+                            React.createElement('p', { className: "text-sm text-gray-400 mb-2" }, `Area: ${surface.area.toFixed(1)} m²`),
+                            React.createElement('select', {
+                                value: selectedMaterials[surface.id] || '',
+                                onChange: (e) => onMaterialChange(surface.id, e.target.value),
+                                className: "w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:outline-none focus:border-purple-500"
+                            },
+                                React.createElement('option', { value: "" }, 'Select material...'),
+                                ...Object.entries(MATERIALS).map(([key, mat]) => 
+                                    React.createElement('option', { key: key, value: key }, mat
