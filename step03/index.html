@@ -5,11 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acoustic Space Analyzer AI Pro</title>
     
+<<<<<<< HEAD
     <!-- External Dependencies -->
+=======
+>>>>>>> b133c4340d356a93f888cdb40db0f1c928297fe0
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+<<<<<<< HEAD
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
     <style>
@@ -146,10 +150,22 @@
             80%, 100% { content: '...'; }
         }
     </style>
+=======
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/PLYLoader.js"></script>
+    
+    <link rel="stylesheet" href="src/styles/main.css">
+    <link rel="stylesheet" href="src/styles/components.css">
+    <link rel="stylesheet" href="src/styles/animations.css">
+>>>>>>> b133c4340d356a93f888cdb40db0f1c928297fe0
 </head>
 <body>
     <div id="root"></div>
 
+<<<<<<< HEAD
     <script type="text/babel">
         const { useState, useRef, useEffect, useCallback } = React;
 
@@ -1065,5 +1081,35 @@
         // Render the application
         ReactDOM.render(React.createElement(AcousticAnalyzerAI), document.getElementById('root'));
     </script>
+=======
+    <script type="text/babel" src="src/constants/materials.js"></script>
+    <script type="text/babel" src="src/constants/frequencies.js"></script>
+    <script type="text/babel" src="src/constants/dsp-processors.js"></script>
+    
+    <script type="text/babel" src="src/utils/audio-utils.js"></script>
+    <script type="text/babel" src="src/utils/3d-utils.js"></script>
+    <script type="text/babel" src="src/utils/ai-utils.js"></script>
+    <script type="text/babel" src="src/utils/calculations.js"></script>
+    
+    <script type="text/babel" src="src/components/ui/Icons.jsx"></script>
+    <script type="text/babel" src="src/components/ui/DemoBanner.jsx"></script>
+    
+    <script type="text/babel" src="src/components/audio/AudioRecorder.jsx"></script>
+    <script type="text/babel" src="src/components/audio/RealTimeFFT.jsx"></script>
+    <script type="text/babel" src="src/components/audio/Equalizer16Band.jsx"></script>
+    
+    <script type="text/babel" src="src/components/3d/FileUploader.jsx"></script>
+    <script type="text/babel" src="src/components/3d/Visualization3D.jsx"></script>
+    <script type="text/babel" src="src/components/3d/MaterialAssignment.jsx"></script>
+    
+    <script type="text/babel" src="src/components/analysis/AIAnalyzer.jsx"></script>
+    <script type="text/babel" src="src/components/analysis/DSPChainDisplay.jsx"></script>
+    <script type="text/babel" src="src/components/analysis/AnalysisResults.jsx"></script>
+    <script type="text/babel" src="src/components/analysis/ExportControls.jsx"></script>
+    
+    <script type="text/babel" src="src/components/ui/APIConfiguration.jsx"></script>
+    
+    <script type="text/babel" src="src/App.jsx"></script>
+>>>>>>> b133c4340d356a93f888cdb40db0f1c928297fe0
 </body>
 </html>
