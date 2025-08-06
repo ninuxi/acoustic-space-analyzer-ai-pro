@@ -1,11 +1,5 @@
 # Acoustic Space Analyzer AI Pro 🎚️
-La versione più recente e completa del progetto è disponibile online. Clicca il pulsante qui sotto per provarla direttamente nel tuo browser.
 
-<div align="center">
-<a href="https://www.google.com/url?sa=E&source=gmail&q=https://ninuxi.github.io/acoustic-space-analyzer-ai-pro/" target="_blank">
-<img src="https://www.google.com/search?q=https://img.shields.io/badge/Launch-Live%2520Demo-brightgreen%3Fstyle%3Dfor-the-badge%26logo%3Dreact" alt="Launch Live Demo" />
-</a>
-</div>
 
 
 > **[🇮🇹 Versione Italiana](README_ita.md)** | **[🌐 Live Demo](https://ninuxi.github.io/acoustic-space-analyzer-ai-pro)**
