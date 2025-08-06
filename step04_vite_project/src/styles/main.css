@@ -1,0 +1,42 @@
+/* File: src/styles/main.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Abbiamo rimosso gli sfondi fissi da 'body' e '#root'
+  per permettere alle classi di Tailwind di funzionare.
+*/
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Stili personalizzati non legati al colore di sfondo possono rimanere */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f1f1; /* Sfondo chiaro per la scrollbar */
+}
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1; /* Colore più scuro per la levetta */
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+.gradient-text {
+    background: linear-gradient(135deg, #06b6d4, #a855f7, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    background-size: 200% 200%;
+    animation: gradientText 4s ease infinite;
+}
+
+/* ... Puoi lasciare qui altri stili personalizzati se ne hai ... */

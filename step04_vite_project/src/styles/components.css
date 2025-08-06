@@ -1,0 +1,538 @@
+/* Component-Specific Styles */
+
+/* Demo Banner */
+.demo-banner {
+    background: linear-gradient(90deg, #f59e0b, #ef4444, #8b5cf6);
+    background-size: 200% 100%;
+    animation: demoBanner 3s ease infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.demo-banner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: shimmer 3s ease infinite;
+}
+
+/* EQ Slider Styles */
+.eq-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 120px;
+    background: transparent;
+    outline: none;
+    writing-mode: bt-lr;
+    -webkit-appearance: slider-vertical;
+    cursor: pointer;
+    position: relative;
+}
+
+.eq-slider::-webkit-slider-track {
+    width: 10px;
+    background: linear-gradient(to top, 
+        #dc2626 0%, 
+        #f59e0b 25%, 
+        #10b981 50%, 
+        #06b6d4 75%, 
+        #8b5cf6 100%
+    );
+    border-radius: 5px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.eq-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 28px;
+    height: 14px;
+    background: linear-gradient(135deg, #10b981, #06b6d4);
+    cursor: pointer;
+    border-radius: 7px;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    transition: all 0.2s ease;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.eq-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.6);
+    background: linear-gradient(135deg, #059669, #0891b2);
+}
+
+.eq-slider::-webkit-slider-thumb:active {
+    transform: scale(1.2);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.8);
+}
+
+/* FFT Visualization */
+.fft-bar {
+    background: linear-gradient(to top, 
+        #dc2626 0%, 
+        #f59e0b 30%, 
+        #10b981 60%, 
+        #06b6d4 80%,
+        #8b5cf6 100%
+    );
+    transition: height 0.08s ease-out;
+    border-radius: 3px 3px 0 0;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.fft-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, 
+        transparent 40%, 
+        rgba(255, 255, 255, 0.15) 50%, 
+        transparent 60%
+    );
+    animation: spectrum 2s ease infinite;
+}
+
+.fft-bar.peak {
+    box-shadow: 0 0 10px rgba(236, 72, 153, 0.6);
+    animation: pulse 0.5s ease;
+}
+
+/* 3D Canvas Container */
+.canvas-container {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 
+        0 10px 30px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    background: linear-gradient(135deg, #1f2937, #111827);
+}
+
+.canvas-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, 
+        rgba(16, 185, 129, 0.1) 0%, 
+        transparent 30%, 
+        transparent 70%, 
+        rgba(236, 72, 153, 0.1) 100%
+    );
+    pointer-events: none;
+    z-index: 1;
+}
+
+.canvas-container canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* DSP Chain Cards */
+.dsp-card {
+    background: linear-gradient(135deg, 
+        rgba(139, 92, 246, 0.15) 0%, 
+        rgba(236, 72, 153, 0.15) 100%
+    );
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    backdrop-filter: blur(12px);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.dsp-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(255, 255, 255, 0.1), 
+        transparent
+    );
+    transition: left 0.5s ease;
+}
+
+.dsp-card:hover::before {
+    left: 100%;
+}
+
+.dsp-card:hover {
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Status Cards */
+.status-card {
+    background: rgba(17, 24, 39, 0.8);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(75, 85, 99, 0.3);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.status-card:hover {
+    background: rgba(31, 41, 55, 0.8);
+    border-color: rgba(107, 114, 128, 0.4);
+}
+
+.status-card-success {
+    border-left: 4px solid #10b981;
+    background: linear-gradient(135deg, 
+        rgba(16, 185, 129, 0.1) 0%, 
+        rgba(17, 24, 39, 0.8) 100%
+    );
+}
+
+.status-card-warning {
+    border-left: 4px solid #f59e0b;
+    background: linear-gradient(135deg, 
+        rgba(245, 158, 11, 0.1) 0%, 
+        rgba(17, 24, 39, 0.8) 100%
+    );
+}
+
+.status-card-error {
+    border-left: 4px solid #ef4444;
+    background: linear-gradient(135deg, 
+        rgba(239, 68, 68, 0.1) 0%, 
+        rgba(17, 24, 39, 0.8) 100%
+    );
+}
+
+/* Material Selector */
+.material-selector {
+    background: rgba(55, 65, 81, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(75, 85, 99, 0.5);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.material-selector:hover {
+    background: rgba(75, 85, 99, 0.8);
+    border-color: rgba(139, 92, 246, 0.5);
+}
+
+.material-selector:focus-within {
+    border-color: rgba(139, 92, 246, 0.8);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.material-preview {
+    height: 14px;
+    border-radius: 7px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.material-preview::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(255, 255, 255, 0.4), 
+        transparent
+    );
+    animation: shimmer 2s ease infinite;
+}
+
+/* Control Buttons */
+.control-btn {
+    position: relative;
+    background: linear-gradient(135deg, #374151, #4b5563);
+    border: 1px solid rgba(107, 114, 128, 0.5);
+    color: white;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    font-weight: 500;
+}
+
+.control-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(255, 255, 255, 0.1), 
+        transparent
+    );
+    transition: left 0.5s ease;
+}
+
+.control-btn:hover::before {
+    left: 100%;
+}
+
+.control-btn:hover {
+    background: linear-gradient(135deg, #4b5563, #6b7280);
+    border-color: rgba(156, 163, 175, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.control-btn-primary {
+    background: linear-gradient(135deg, #8b5cf6, #a855f7);
+    border-color: rgba(168, 85, 247, 0.5);
+}
+
+.control-btn-primary:hover {
+    background: linear-gradient(135deg, #a855f7, #c084fc);
+    border-color: rgba(192, 132, 252, 0.6);
+    box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
+}
+
+.control-btn-success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: rgba(5, 150, 105, 0.5);
+}
+
+.control-btn-success:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    border-color: rgba(4, 120, 87, 0.6);
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+}
+
+.control-btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border-color: rgba(220, 38, 38, 0.5);
+}
+
+.control-btn-danger:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    border-color: rgba(185, 28, 28, 0.6);
+    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+}
+
+/* Progress Bars */
+.progress-bar {
+    background: rgba(55, 65, 81, 0.8);
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, #06b6d4, #8b5cf6, #ec4899);
+    background-size: 200% 100%;
+    animation: gradientShift 2s ease infinite;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, 
+        rgba(255, 255, 255, 0.1) 25%, 
+        transparent 25%, 
+        transparent 50%, 
+        rgba(255, 255, 255, 0.1) 50%, 
+        rgba(255, 255, 255, 0.1) 75%, 
+        transparent 75%
+    );
+    background-size: 20px 20px;
+    animation: progressStripes 1s linear infinite;
+}
+
+/* Modal Styles */
+.modal-backdrop {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #1f2937, #111827);
+    border: 1px solid rgba(75, 85, 99, 0.3);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+/* Tooltip Styles */
+.tooltip {
+    position: relative;
+}
+
+.tooltip::before,
+.tooltip::after {
+    position: absolute;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+.tooltip::before {
+    content: attr(data-tooltip);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    white-space: nowrap;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 8px;
+}
+
+.tooltip::after {
+    content: '';
+    border: 6px solid transparent;
+    border-top-color: rgba(0, 0, 0, 0.9);
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 2px;
+}
+
+.tooltip:hover::before,
+.tooltip:hover::after {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Card Styles */
+.card {
+    /* Abbiamo rimosso background, backdrop-filter e border */
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); /* Ombra più leggera per tema chiaro */
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    background: rgba(31, 41, 55, 0.8);
+    border-color: rgba(107, 114, 128, 0.4);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.card-header {
+    border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+    padding: 1.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.card-footer {
+    border-top: 1px solid rgba(75, 85, 99, 0.2);
+    padding: 1rem 1.5rem;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/* Badge Styles */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge-success {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-error {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge-info {
+    background: rgba(6, 182, 212, 0.2);
+    color: #06b6d4;
+    border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+/* Loading Spinner */
+.loading-spinner {
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top: 3px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .eq-slider {
+        height: 80px;
+    }
+    
+    .eq-slider::-webkit-slider-thumb {
+        width: 20px;
+        height: 10px;
+    }
+    
+    .fft-bar {
+        border-radius: 2px 2px 0 0;
+    }
+    
+    .dsp-card {
+        min-width: 150px;
+    }
+}
+
+@media (max-width: 640px) {
+    .canvas-container {
+        border-radius: 8px;
+    }
+    
+    .control-btn {
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .card {
+        border-radius: 8px;
+    }
+    
+    .card-header,
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .card-footer {
+        padding: 0.75rem 1rem;
+    }
+}
