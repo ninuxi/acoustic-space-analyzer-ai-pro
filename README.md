@@ -20,7 +20,7 @@ Professional acoustic analysis tool with AI-based DSP chain generation.
 
 ## 🚀 **Live Demo**
 
-**[🌐 Try the online demo now](https://ninuxi.github.io/acoustic-space-analyzer-ai-pro/en)**
+**[🌐 Try the online demo now](https://ninuxi.github.io/acoustic-space-analyzer-ai-pro)**
 
 - ✅ No installation required
 - ✅ Pre-loaded garage demo
